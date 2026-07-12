@@ -288,10 +288,14 @@ def check_build_c_library():
         # Code already built
         return destlib
     # Select command line options
+    compile_args = COMPILE_ARGS
+    import sys
+    if sys.platform == 'darwin':
+        compile_args = compile_args.replace(" -fwhole-program -fno-use-linker-plugin", "")
     if check_gcc_option(SSE_FLAGS):
-        cmd = "%s %s %s" % (GCC_CMD, SSE_FLAGS, COMPILE_ARGS)
+        cmd = "%s %s %s" % (GCC_CMD, SSE_FLAGS, compile_args)
     else:
-        cmd = "%s %s" % (GCC_CMD, COMPILE_ARGS)
+        cmd = "%s %s" % (GCC_CMD, compile_args)
     # Invoke compiler
     logging.info("Building C code module %s", DEST_LIB)
     tempdestlib = get_abs_files(srcdir, ["_temp_" + DEST_LIB])[0]

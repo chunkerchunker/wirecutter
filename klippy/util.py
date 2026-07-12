@@ -23,9 +23,9 @@ def set_nonblock(fd):
 
 # Clear HUPCL flag
 def clear_hupcl(fd):
-    attrs = termios.tcgetattr(fd)
-    attrs[2] = attrs[2] & ~termios.HUPCL
     try:
+        attrs = termios.tcgetattr(fd)
+        attrs[2] = attrs[2] & ~termios.HUPCL
         termios.tcsetattr(fd, termios.TCSADRAIN, attrs)
     except termios.error:
         pass

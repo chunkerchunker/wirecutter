@@ -12,7 +12,21 @@
 // clock times, prioritizes commands, and handles retransmissions.  A
 // background thread is launched to do this work and minimize latency.
 
+#ifdef __APPLE__
+#include <stdint.h>
+#define CAN_MAX_DLEN 8
+typedef uint32_t canid_t;
+struct can_frame {
+    canid_t can_id;
+    uint8_t can_dlc;
+    uint8_t __pad;
+    uint8_t __res0;
+    uint8_t __res1;
+    uint8_t data[CAN_MAX_DLEN];
+};
+#else
 #include <linux/can.h> // // struct can_frame
+#endif
 #include <math.h> // fabs
 #include <pthread.h> // pthread_mutex_lock
 #include <stddef.h> // offsetof
