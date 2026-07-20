@@ -1,3 +1,6 @@
+tmp
+.DS_Store
+
 out
 *.so
 *.pyc
