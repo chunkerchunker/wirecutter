@@ -3,18 +3,152 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hotwire Cutter</title>
+<title>Hotwire Cutter - Klipper Control</title>
 <style>
-  html, body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    margin: 0;
+  :root {
+    --bg-gradient: linear-gradient(135deg, #1e2024 0%, #121316 100%);
+    --card-bg: rgba(255, 255, 255, 0.05);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --text-primary: #f0f4f8;
+    --text-secondary: #94a3b8;
+    --accent-color: #3b82f6;
+    --accent-hover: #2563eb;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --btn-bg: rgba(255, 255, 255, 0.07);
+    --btn-hover: rgba(255, 255, 255, 0.15);
+    --btn-active: rgba(59, 130, 246, 0.3);
   }
 
-  body {
-    background-color: #808080;
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    min-height: 100vh;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg-gradient);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .app-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    max-width: 480px;
+    width: 100%;
+  }
+
+  .header {
+    text-align: center;
+    width: 100%;
+  }
+
+  .header h1 {
+    margin: 0 0 8px 0;
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    padding: 10px 16px;
+    border-radius: 12px;
+    width: 100%;
+    backdrop-filter: blur(10px);
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--danger-color);
+    box-shadow: 0 0 8px var(--danger-color);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+
+  .dot.connected {
+    background-color: var(--success-color);
+    box-shadow: 0 0 8px var(--success-color);
+  }
+
+  .dot.connecting {
+    background-color: var(--warning-color);
+    box-shadow: 0 0 8px var(--warning-color);
+    animation: pulse 1s infinite alternate;
+  }
+
+  @keyframes pulse {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+  }
+
+  .action-btns {
+    display: flex;
+    gap: 8px;
+  }
+
+  .connect-btn {
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .connect-btn:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+  }
+
+  .connect-btn.connected {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--danger-color);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+  }
+
+  .connect-btn.connected:hover {
+    background: rgba(239, 68, 68, 0.3);
+  }
+
+  .panel-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 24px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    width: 100%;
   }
 
   .panel {
@@ -35,20 +169,46 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    color: var(--text-secondary);
+    padding-bottom: 8px;
+  }
+
+  .icon-cell svg path {
+    fill: #cbd5e1;
   }
 
   .btn {
-    border: 0;
+    border: 1px solid var(--card-border);
     padding: 0;
     font: inherit;
     cursor: pointer;
     width: 100px;
     height: 100px;
-    background: rgba(128, 128, 128, 0.2);
+    background: var(--btn-bg);
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
+    transition: all 0.15s ease-in-out;
+    outline: none;
+    user-select: none;
+  }
+
+  .btn svg path {
+    fill: #f1f5f9;
+    transition: fill 0.2s ease;
+  }
+
+  .btn:hover {
+    background: var(--btn-hover);
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+
+  .btn:active, .btn.active-press {
+    transform: scale(0.96);
+    background: var(--btn-active);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
   }
 
   .btn-up {
@@ -67,6 +227,10 @@
     box-shadow: 0 5px 5px rgba(0, 0, 0, 0.25), inset 0 5px 5px rgba(0, 0, 0, 0.25);
   }
 
+  .btn-home:hover svg path {
+    fill: #60a5fa;
+  }
+
   .ga-knife-icon { grid-area: knife-icon; }
   .ga-bed-icon   { grid-area: bed-icon; }
   .ga-knife-up   { grid-area: knife-up; }
@@ -74,57 +238,403 @@
   .ga-home       { grid-area: home; }
   .ga-knife-down { grid-area: knife-down; }
   .ga-bed-down   { grid-area: bed-down; }
+
+  /* Terminal Log Section */
+  .terminal-card {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .terminal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--card-border);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .terminal-output {
+    height: 120px;
+    padding: 10px 14px;
+    font-family: "JetBrains Mono", "Fira Code", Monaco, Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    overflow-y: auto;
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .terminal-line {
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+
+  .terminal-line.sent {
+    color: #60a5fa;
+    font-weight: 600;
+  }
+
+  .terminal-line.error {
+    color: #f87171;
+  }
+
+  .terminal-line.system {
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  .terminal-input-bar {
+    display: flex;
+    border-top: 1px solid var(--card-border);
+  }
+
+  .terminal-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
+    color: #fff;
+    font-family: monospace;
+    font-size: 0.85rem;
+    outline: none;
+  }
+
+  .terminal-send {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    border-left: 1px solid var(--card-border);
+    color: var(--text-secondary);
+    padding: 0 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .terminal-send:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+  }
 </style>
 </head>
 <body>
-  <div class="panel">
 
-    <div class="icon-cell ga-knife-icon">
-      <svg width="60" height="60" viewBox="0 0 48.1699 45.1296" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M2.1132 43.5467C1.6136 43.3799 1.16488 43.0883 0.809578 42.6995C0.454279 42.3106 0.204175 41.8375 0.0829805 41.3249C-0.0382143 40.8124 -0.0264842 40.2773 0.117059 39.7706C0.260602 39.2638 0.531201 38.8021 0.9032 38.4292L38.2357 1.0967C38.9388 0.394448 39.8919 0 40.8857 0C41.8795 0 42.8326 0.394448 43.5357 1.0967L47.0732 4.6342C47.7755 5.33733 48.1699 6.29045 48.1699 7.2842C48.1699 8.27795 47.7755 9.23107 47.0732 9.9342L35.5832 21.4267L40.4032 26.2467C40.7101 26.5538 40.9497 26.9215 41.1066 27.3263C41.2636 27.7312 41.3344 28.1643 41.3146 28.598C41.2949 29.0317 41.185 29.4566 40.9919 29.8455C40.7988 30.2344 40.5268 30.5788 40.1932 30.8567L31.6532 37.9717C27.6111 41.3387 22.7763 43.618 17.6069 44.5936C12.4374 45.5692 7.10443 45.2089 2.1132 43.5467Z" fill="black"/>
-      </svg>
+  <div class="app-container">
+    <div class="header">
+      <h1>Hotwire Cutter</h1>
     </div>
 
-    <div class="icon-cell ga-bed-icon">
-      <svg width="60" height="60" viewBox="0 0 20 13.9989" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M1 0C1.24493 3.23106e-05 1.48134 0.089956 1.66437 0.252715C1.84741 0.415474 1.96434 0.639749 1.993 0.883L2 1V8H9V3C9.00003 2.75507 9.08996 2.51866 9.25272 2.33563C9.41547 2.15259 9.63975 2.03566 9.883 2.007L10 2H17C17.7652 1.99996 18.5015 2.29233 19.0583 2.81728C19.615 3.34224 19.9501 4.06011 19.995 4.824L20 5V13C19.9997 13.2549 19.9021 13.5 19.7272 13.6854C19.5522 13.8707 19.313 13.9822 19.0586 13.9972C18.8042 14.0121 18.5536 13.9293 18.3582 13.7657C18.1627 13.6021 18.0371 13.3701 18.007 13.117L18 13V10H2V13C1.99972 13.2549 1.90212 13.5 1.72715 13.6854C1.55218 13.8707 1.31305 13.9822 1.05861 13.9972C0.804163 14.0121 0.553621 13.9293 0.358167 13.7657C0.162714 13.6021 0.0371036 13.3701 0.00699997 13.117L0 13V1C0 0.734784 0.105357 0.48043 0.292893 0.292893C0.48043 0.105357 0.734784 0 1 0ZM5.5 2C6.16304 2 6.79893 2.26339 7.26777 2.73223C7.73661 3.20107 8 3.83696 8 4.5C8 5.16304 7.73661 5.79893 7.26777 6.26777C6.79893 6.73661 6.16304 7 5.5 7C4.83696 7 4.20107 6.73661 3.73223 6.26777C3.26339 5.79893 3 5.16304 3 4.5C3 3.83696 3.26339 3.20107 3.73223 2.73223C4.20107 2.26339 4.83696 2 5.5 2Z" fill="black"/>
-      </svg>
+    <div class="status-bar">
+      <div class="status-indicator">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">Disconnected</span>
+      </div>
+      <div class="action-btns">
+        <button class="connect-btn" id="connect-btn">Connect /tmp/printer</button>
+      </div>
     </div>
 
-    <button class="btn btn-up ga-knife-up" aria-label="Knife up">
-      <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="black"/>
-      </svg>
-    </button>
+    <div class="panel-card">
+      <div class="panel">
 
-    <button class="btn btn-up ga-bed-up" aria-label="Bed up">
-      <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="black"/>
-      </svg>
-    </button>
+        <div class="icon-cell ga-knife-icon">
+          <svg width="60" height="60" viewBox="0 0 48.1699 45.1296" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M2.1132 43.5467C1.6136 43.3799 1.16488 43.0883 0.809578 42.6995C0.454279 42.3106 0.204175 41.8375 0.0829805 41.3249C-0.0382143 40.8124 -0.0264842 40.2773 0.117059 39.7706C0.260602 39.2638 0.531201 38.8021 0.9032 38.4292L38.2357 1.0967C38.9388 0.394448 39.8919 0 40.8857 0C41.8795 0 42.8326 0.394448 43.5357 1.0967L47.0732 4.6342C47.7755 5.33733 48.1699 6.29045 48.1699 7.2842C48.1699 8.27795 47.7755 9.23107 47.0732 9.9342L35.5832 21.4267L40.4032 26.2467C40.7101 26.5538 40.9497 26.9215 41.1066 27.3263C41.2636 27.7312 41.3344 28.1643 41.3146 28.598C41.2949 29.0317 41.185 29.4566 40.9919 29.8455C40.7988 30.2344 40.5268 30.5788 40.1932 30.8567L31.6532 37.9717C27.6111 41.3387 22.7763 43.618 17.6069 44.5936C12.4374 45.5692 7.10443 45.2089 2.1132 43.5467Z" fill="currentColor"/>
+          </svg>
+        </div>
 
-    <button class="btn btn-home ga-home" aria-label="Home">
-      <svg width="60" height="60" viewBox="0 0 50 53.75" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M5 38.75V16.25C5 15.4583 5.1775 14.7083 5.5325 14C5.8875 13.2917 6.37667 12.7083 7 12.25L22 1C22.875 0.333334 23.875 0 25 0C26.125 0 27.125 0.333334 28 1L43 12.25C43.625 12.7083 44.115 13.2917 44.47 14C44.825 14.7083 45.0017 15.4583 45 16.25V38.75C45 40.125 44.51 41.3025 43.53 42.2825C42.55 43.2625 41.3733 43.7517 40 43.75H32.5C31.7917 43.75 31.1983 43.51 30.72 43.03C30.2417 42.55 30.0017 41.9567 30 41.25V28.75C30 28.0417 29.76 27.4483 29.28 26.97C28.8 26.4917 28.2067 26.2517 27.5 26.25H22.5C21.7917 26.25 21.1983 26.49 20.72 26.97C20.2417 27.45 20.0017 28.0433 20 28.75V41.25C20 41.9583 19.76 42.5525 19.28 43.0325C18.8 43.5125 18.2067 43.7517 17.5 43.75H10C8.625 43.75 7.44833 43.2608 6.47 42.2825C5.49167 41.3042 5.00167 40.1267 5 38.75Z" fill="black"/>
-      </svg>
-    </button>
+        <div class="icon-cell ga-bed-icon">
+          <svg width="60" height="60" viewBox="0 0 20 13.9989" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="M1 0C1.24493 3.23106e-05 1.48134 0.089956 1.66437 0.252715C1.84741 0.415474 1.96434 0.639749 1.993 0.883L2 1V8H9V3C9.00003 2.75507 9.08996 2.51866 9.25272 2.33563C9.41547 2.15259 9.63975 2.03566 9.883 2.007L10 2H17C17.7652 1.99996 18.5015 2.29233 19.0583 2.81728C19.615 3.34224 19.9501 4.06011 19.995 4.824L20 5V13C19.9997 13.2549 19.9021 13.5 19.7272 13.6854C19.5522 13.8707 19.313 13.9822 19.0586 13.9972C18.8042 14.0121 18.5536 13.9293 18.3582 13.7657C18.1627 13.6021 18.0371 13.3701 18.007 13.117L18 13V10H2V13C1.99972 13.2549 1.90212 13.5 1.72715 13.6854C1.55218 13.8707 1.31305 13.9822 1.05861 13.9972C0.804163 14.0121 0.553621 13.9293 0.358167 13.7657C0.162714 13.6021 0.0371036 13.3701 0.00699997 13.117L0 13V1C0 0.734784 0.105357 0.48043 0.292893 0.292893C0.48043 0.105357 0.734784 0 1 0ZM5.5 2C6.16304 2 6.79893 2.26339 7.26777 2.73223C7.73661 3.20107 8 3.83696 8 4.5C8 5.16304 7.73661 5.79893 7.26777 6.26777C6.79893 6.73661 6.16304 7 5.5 7C4.83696 7 4.20107 6.73661 3.73223 6.26777C3.26339 5.79893 3 5.16304 3 4.5C3 3.83696 3.26339 3.20107 3.73223 2.73223C4.20107 2.26339 4.83696 2 5.5 2Z" fill="currentColor"/>
+          </svg>
+        </div>
 
-    <button class="btn btn-down ga-knife-down" aria-label="Knife down">
-      <span style="display: inline-flex; transform: rotate(180deg);">
-        <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="black"/>
-        </svg>
-      </span>
-    </button>
+        <button class="btn btn-up ga-knife-up" aria-label="Knife up">
+          <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="currentColor"/>
+          </svg>
+        </button>
 
-    <button class="btn btn-down ga-bed-down" aria-label="Bed down">
-      <span style="display: inline-flex; transform: rotate(180deg);">
-        <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="black"/>
-        </svg>
-      </span>
-    </button>
+        <button class="btn btn-up ga-bed-up" aria-label="Bed up">
+          <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="currentColor"/>
+          </svg>
+        </button>
+
+        <button class="btn btn-home ga-home" id="btn-home" aria-label="Home">
+          <svg width="60" height="60" viewBox="0 0 50 53.75" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 38.75V16.25C5 15.4583 5.1775 14.7083 5.5325 14C5.8875 13.2917 6.37667 12.7083 7 12.25L22 1C22.875 0.333334 23.875 0 25 0C26.125 0 27.125 0.333334 28 1L43 12.25C43.625 12.7083 44.115 13.2917 44.47 14C44.825 14.7083 45.0017 15.4583 45 16.25V38.75C45 40.125 44.51 41.3025 43.53 42.2825C42.55 43.2625 41.3733 43.7517 40 43.75H32.5C31.7917 43.75 31.1983 43.51 30.72 43.03C30.2417 42.55 30.0017 41.9567 30 41.25V28.75C30 28.0417 29.76 27.4483 29.28 26.97C28.8 26.4917 28.2067 26.2517 27.5 26.25H22.5C21.7917 26.25 21.1983 26.49 20.72 26.97C20.2417 27.45 20.0017 28.0433 20 28.75V41.25C20 41.9583 19.76 42.5525 19.28 43.0325C18.8 43.5125 18.2067 43.7517 17.5 43.75H10C8.625 43.75 7.44833 43.2608 6.47 42.2825C5.49167 41.3042 5.00167 40.1267 5 38.75Z" fill="currentColor"/>
+          </svg>
+        </button>
+
+        <button class="btn btn-down ga-knife-down" aria-label="Knife down">
+          <span style="display: inline-flex; transform: rotate(180deg);">
+            <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="currentColor"/>
+            </svg>
+          </span>
+        </button>
+
+        <button class="btn btn-down ga-bed-down" aria-label="Bed down">
+          <span style="display: inline-flex; transform: rotate(180deg);">
+            <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="currentColor"/>
+            </svg>
+          </span>
+        </button>
+
+      </div>
+    </div>
+
+    <div class="terminal-card">
+      <div class="terminal-header">
+        <span>Serial Terminal</span>
+        <span id="terminal-clear" style="cursor: pointer;">Clear</span>
+      </div>
+      <div class="terminal-output" id="terminal-output">
+        <div class="terminal-line system">Ready. Click Connect or Home button to link to /tmp/printer.</div>
+      </div>
+      <form class="terminal-input-bar" id="terminal-form">
+        <input type="text" class="terminal-input" id="terminal-input" placeholder="Send G-code command..." autocomplete="off">
+        <button type="submit" class="terminal-send">Send</button>
+      </form>
+    </div>
 
   </div>
+
+<script>
+  let ws = null;
+  let serialPort = null;
+  let serialWriter = null;
+  let serialReader = null;
+  let isConnecting = false;
+
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const connectBtn = document.getElementById('connect-btn');
+  const terminalOutput = document.getElementById('terminal-output');
+  const terminalForm = document.getElementById('terminal-form');
+  const terminalInput = document.getElementById('terminal-input');
+  const terminalClear = document.getElementById('terminal-clear');
+  const homeBtn = document.getElementById('btn-home');
+
+  function updateStatus(state, message) {
+    statusDot.className = 'dot ' + state;
+    statusText.textContent = message;
+    if (state === 'connected') {
+      connectBtn.textContent = 'Disconnect';
+      connectBtn.classList.add('connected');
+    } else {
+      connectBtn.textContent = 'Connect /tmp/printer';
+      connectBtn.classList.remove('connected');
+    }
+  }
+
+  function logTerminal(text, type = '') {
+    const line = document.createElement('div');
+    line.className = 'terminal-line ' + type;
+    line.textContent = text;
+    terminalOutput.appendChild(line);
+    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+  }
+
+  function isConnected() {
+    return (ws && ws.readyState === WebSocket.OPEN) || (serialPort && serialPort.writable);
+  }
+
+  async function connectBridge() {
+    if (isConnected()) return true;
+    if (isConnecting) return false;
+
+    isConnecting = true;
+    updateStatus('connecting', 'Connecting to bridge...');
+    logTerminal('Attempting WebSocket bridge (ws://127.0.0.1:8765)...', 'system');
+
+    return new Promise((resolve) => {
+      try {
+        const socket = new WebSocket('ws://127.0.0.1:8765');
+        const timeout = setTimeout(() => {
+          if (socket.readyState !== WebSocket.OPEN) {
+            socket.close();
+            onWsFailure();
+          }
+        }, 2500);
+
+        socket.onopen = () => {
+          clearTimeout(timeout);
+          ws = socket;
+          isConnecting = false;
+          updateStatus('connected', 'Connected via WebSocket');
+          logTerminal('Successfully connected to /tmp/printer via WebSocket bridge!', 'system');
+          resolve(true);
+        };
+
+        socket.onmessage = (event) => {
+          if (event.data) {
+            const lines = event.data.split('\n');
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed) {
+                logTerminal(trimmed);
+              }
+            }
+          }
+        };
+
+        socket.onerror = (err) => {
+          clearTimeout(timeout);
+        };
+
+        socket.onclose = () => {
+          clearTimeout(timeout);
+          if (ws === socket) {
+            ws = null;
+            updateStatus('disconnected', 'Disconnected');
+            logTerminal('WebSocket connection closed.', 'system');
+          } else if (isConnecting) {
+            onWsFailure();
+          }
+        };
+
+        async function onWsFailure() {
+          isConnecting = false;
+          logTerminal('Notice: WebSocket bridge at ws://127.0.0.1:8765 not responding.', 'system');
+          logTerminal('To connect to fake serial device /tmp/printer, run in terminal: "just web-bridge"', 'system');
+          
+          // Check Web Serial as secondary option
+          if ('serial' in navigator) {
+            try {
+              logTerminal('Prompting Web Serial device picker...', 'system');
+              serialPort = await navigator.serial.requestPort();
+              await serialPort.open({ baudRate: 115200 });
+              updateStatus('connected', 'Connected via Web Serial');
+              logTerminal('Connected to hardware serial port via Web Serial API.', 'system');
+              startWebSerialRead();
+              resolve(true);
+              return;
+            } catch (err) {
+              logTerminal('Web Serial request cancelled or failed: ' + err.message, 'error');
+            }
+          }
+          updateStatus('disconnected', 'Disconnected');
+          resolve(false);
+        }
+      } catch (err) {
+        isConnecting = false;
+        updateStatus('disconnected', 'Connection error');
+        logTerminal('Bridge connection error: ' + err.message, 'error');
+        resolve(false);
+      }
+    });
+  }
+
+  async function disconnectAll() {
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    if (serialPort) {
+      try {
+        if (serialReader) await serialReader.cancel();
+        await serialPort.close();
+      } catch (e) {}
+      serialPort = null;
+    }
+    updateStatus('disconnected', 'Disconnected');
+    logTerminal('Disconnected.', 'system');
+  }
+
+  async function startWebSerialRead() {
+    let buffer = '';
+    const textDecoder = new TextDecoderStream();
+    serialPort.readable.pipeTo(textDecoder.writable);
+    serialReader = textDecoder.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await serialReader.read();
+        if (done) break;
+        if (value) {
+          buffer += value;
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (line.trim()) logTerminal(line.trim());
+          }
+        }
+      }
+    } catch (e) {
+      logTerminal('Serial read error: ' + e.message, 'error');
+    }
+  }
+
+  async function sendGcode(gcode) {
+    const trimmed = gcode.trim();
+    if (!trimmed) return;
+
+    if (!isConnected()) {
+      const ok = await connectBridge();
+      if (!ok) return;
+    }
+
+    try {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(trimmed);
+        logTerminal('> ' + trimmed, 'sent');
+      } else if (serialPort && serialPort.writable) {
+        const encoder = new TextEncoder();
+        const writer = serialPort.writable.getWriter();
+        await writer.write(encoder.encode(trimmed + '\n'));
+        writer.releaseLock();
+        logTerminal('> ' + trimmed, 'sent');
+      }
+    } catch (err) {
+      console.error('Send error:', err);
+      logTerminal('Failed to send: ' + err.message, 'error');
+    }
+  }
+
+  // Event Listeners
+  connectBtn.addEventListener('click', () => {
+    if (isConnected()) {
+      disconnectAll();
+    } else {
+      connectBridge();
+    }
+  });
+
+  homeBtn.addEventListener('click', async () => {
+    homeBtn.classList.add('active-press');
+    setTimeout(() => homeBtn.classList.remove('active-press'), 200);
+    await sendGcode('G28');
+  });
+
+  terminalForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const cmd = terminalInput.value;
+    if (cmd) {
+      sendGcode(cmd);
+      terminalInput.value = '';
+    }
+  });
+
+  terminalClear.addEventListener('click', () => {
+    terminalOutput.innerHTML = '';
+  });
+
+  // Attempt auto-connecting to bridge on load
+  window.addEventListener('DOMContentLoaded', () => {
+    connectBridge();
+  });
+</script>
 </body>
 </html>

@@ -3,3 +3,7 @@ klippy:
 
 serial:
 	.venv/bin/python -m serial.tools.miniterm --eol LF /tmp/printer
+
+web-bridge:
+	.venv/bin/python scripts/web_bridge.py
+
