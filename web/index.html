@@ -42,7 +42,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 24px;
+    gap: 20px;
     max-width: 480px;
     width: 100%;
   }
@@ -53,7 +53,7 @@
   }
 
   .header h1 {
-    margin: 0 0 8px 0;
+    margin: 0 0 4px 0;
     font-size: 1.75rem;
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -139,6 +139,65 @@
     background: rgba(239, 68, 68, 0.3);
   }
 
+  /* Minimal Feedrate Settings Bar */
+  .settings-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    padding: 8px 14px;
+    border-radius: 12px;
+    width: 100%;
+    backdrop-filter: blur(10px);
+    gap: 12px;
+  }
+
+  .setting-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .setting-label {
+    font-weight: 500;
+  }
+
+  .input-with-unit {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 3px 6px;
+  }
+
+  .input-with-unit input {
+    width: 54px;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: right;
+    outline: none;
+    -moz-appearance: textfield;
+  }
+
+  .input-with-unit input::-webkit-outer-spin-button,
+  .input-with-unit input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .input-with-unit .unit {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-left: 4px;
+  }
+
   .panel-card {
     background: var(--card-bg);
     border: 1px solid var(--card-border);
@@ -192,6 +251,8 @@
     transition: all 0.15s ease-in-out;
     outline: none;
     user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
   }
 
   .btn svg path {
@@ -344,6 +405,23 @@
       </div>
     </div>
 
+    <div class="settings-bar">
+      <div class="setting-item">
+        <span class="setting-label">Knife (Z):</span>
+        <div class="input-with-unit">
+          <input type="number" id="feedrate-knife" value="400" min="10" max="400" step="10">
+          <span class="unit">mm/m</span>
+        </div>
+      </div>
+      <div class="setting-item">
+        <span class="setting-label">Bed (Y):</span>
+        <div class="input-with-unit">
+          <input type="number" id="feedrate-bed" value="18000" min="100" max="18000" step="500">
+          <span class="unit">mm/m</span>
+        </div>
+      </div>
+    </div>
+
     <div class="panel-card">
       <div class="panel">
 
@@ -359,13 +437,13 @@
           </svg>
         </div>
 
-        <button class="btn btn-up ga-knife-up" aria-label="Knife up">
+        <button class="btn btn-up ga-knife-up" id="btn-knife-up" aria-label="Knife up">
           <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="currentColor"/>
           </svg>
         </button>
 
-        <button class="btn btn-up ga-bed-up" aria-label="Bed up">
+        <button class="btn btn-up ga-bed-up" id="btn-bed-up" aria-label="Bed up">
           <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="currentColor"/>
           </svg>
@@ -377,7 +455,7 @@
           </svg>
         </button>
 
-        <button class="btn btn-down ga-knife-down" aria-label="Knife down">
+        <button class="btn btn-down ga-knife-down" id="btn-knife-down" aria-label="Knife down">
           <span style="display: inline-flex; transform: rotate(180deg);">
             <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="currentColor"/>
@@ -385,7 +463,7 @@
           </span>
         </button>
 
-        <button class="btn btn-down ga-bed-down" aria-label="Bed down">
+        <button class="btn btn-down ga-bed-down" id="btn-bed-down" aria-label="Bed down">
           <span style="display: inline-flex; transform: rotate(180deg);">
             <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z" fill="currentColor"/>
@@ -418,6 +496,10 @@
   let serialWriter = null;
   let serialReader = null;
   let isConnecting = false;
+  let pendingOks = 0;
+
+  let jogTimer = null;
+  let activeBtn = null;
 
   const statusDot = document.getElementById('status-dot');
   const statusText = document.getElementById('status-text');
@@ -427,6 +509,14 @@
   const terminalInput = document.getElementById('terminal-input');
   const terminalClear = document.getElementById('terminal-clear');
   const homeBtn = document.getElementById('btn-home');
+
+  const knifeUpBtn = document.getElementById('btn-knife-up');
+  const knifeDownBtn = document.getElementById('btn-knife-down');
+  const bedUpBtn = document.getElementById('btn-bed-up');
+  const bedDownBtn = document.getElementById('btn-bed-down');
+
+  const inputKnifeFeedrate = document.getElementById('feedrate-knife');
+  const inputBedFeedrate = document.getElementById('feedrate-bed');
 
   function updateStatus(state, message) {
     statusDot.className = 'dot ' + state;
@@ -441,6 +531,9 @@
   }
 
   function logTerminal(text, type = '') {
+    if (text.startsWith('ok')) {
+      pendingOks = Math.max(0, pendingOks - 1);
+    }
     const line = document.createElement('div');
     line.className = 'terminal-line ' + type;
     line.textContent = text;
@@ -511,7 +604,6 @@
           logTerminal('Notice: WebSocket bridge at ws://127.0.0.1:8765 not responding.', 'system');
           logTerminal('To connect to fake serial device /tmp/printer, run in terminal: "just web-bridge"', 'system');
           
-          // Check Web Serial as secondary option
           if ('serial' in navigator) {
             try {
               logTerminal('Prompting Web Serial device picker...', 'system');
@@ -539,6 +631,7 @@
   }
 
   async function disconnectAll() {
+    stopJog();
     if (ws) {
       ws.close();
       ws = null;
@@ -587,6 +680,7 @@
     }
 
     try {
+      pendingOks++;
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(trimmed);
         logTerminal('> ' + trimmed, 'sent');
@@ -603,7 +697,95 @@
     }
   }
 
-  // Event Listeners
+  // --- PRESS & HOLD JOGGING LOGIC ---
+  async function startJog(btn, axis, direction) {
+    if (jogTimer) stopJog();
+
+    activeBtn = btn;
+    activeBtn.classList.add('active-press');
+
+    // Make sure we are connected
+    if (!isConnected()) {
+      const connected = await connectBridge();
+      if (!connected) {
+        stopJog();
+        return;
+      }
+    }
+
+    // Get feedrate for axis
+    let maxRate = 400;
+    let inputEl = inputKnifeFeedrate;
+    if (axis === 'Y') {
+      maxRate = 18000;
+      inputEl = inputBedFeedrate;
+    }
+
+    let feedrate = parseFloat(inputEl.value);
+    if (isNaN(feedrate) || feedrate <= 0) feedrate = maxRate;
+    feedrate = Math.min(feedrate, maxRate);
+
+    // Calculate incremental distance for 100ms tick:
+    // (feedrate / 60) mm/s * 0.08 s
+    const stepDist = Math.max(0.05, (feedrate / 60) * 0.08).toFixed(2);
+    const sign = direction > 0 ? '+' : '-';
+    const jogCmd = `G1 ${axis}${sign}${stepDist} F${feedrate.toFixed(0)}`;
+
+    // Set relative positioning
+    await sendGcode('G91');
+    await sendGcode(jogCmd);
+
+    jogTimer = setInterval(() => {
+      // Backpressure check: don't buffer more than 2 unacknowledged moves
+      if (pendingOks < 2) {
+        sendGcode(jogCmd);
+      }
+    }, 100);
+  }
+
+  async function stopJog() {
+    if (activeBtn) {
+      activeBtn.classList.remove('active-press');
+      activeBtn = null;
+    }
+    if (jogTimer) {
+      clearInterval(jogTimer);
+      jogTimer = null;
+      // Restore absolute positioning
+      sendGcode('G90');
+    }
+  }
+
+  function attachJogEvents(btn, axis, direction) {
+    const startHandler = (e) => {
+      e.preventDefault();
+      startJog(btn, axis, direction);
+    };
+
+    const stopHandler = (e) => {
+      e.preventDefault();
+      stopJog();
+    };
+
+    btn.addEventListener('mousedown', startHandler);
+    btn.addEventListener('touchstart', startHandler);
+
+    btn.addEventListener('mouseup', stopHandler);
+    btn.addEventListener('mouseleave', stopHandler);
+    btn.addEventListener('touchend', stopHandler);
+    btn.addEventListener('touchcancel', stopHandler);
+  }
+
+  // Attach Jog Event Handlers
+  // Knife: Z Axis (Up: +1, Down: -1)
+  attachJogEvents(knifeUpBtn, 'Z', 1);
+  attachJogEvents(knifeDownBtn, 'Z', -1);
+
+  // Bed: Y Axis (Up: +1, Down: -1)
+  attachJogEvents(bedUpBtn, 'Y', 1);
+  attachJogEvents(bedDownBtn, 'Y', -1);
+
+  // Other Event Listeners
   connectBtn.addEventListener('click', () => {
     if (isConnected()) {
       disconnectAll();
