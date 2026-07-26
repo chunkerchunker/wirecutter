@@ -6,7 +6,3 @@ klippy:
 
 serial:
 	uv run python -m serial.tools.miniterm --eol LF /tmp/printer
-
-web-bridge:
-	uv run scripts/web_bridge.py
-

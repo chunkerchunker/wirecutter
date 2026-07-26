@@ -11,6 +11,8 @@ import hashlib
 import base64
 import struct
 import time
+import threading
+import logging
 
 HOST = "127.0.0.1"
 PORT = 8765
@@ -18,6 +20,7 @@ SERIAL_PATH = "/tmp/printer"
 
 clients = set()
 serial_fd = None
+running_loop = None
 
 WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -84,9 +87,9 @@ def parse_frames(buffer):
     return frames, buffer
 
 async def handle_client(reader, writer):
-    global serial_fd
+    global serial_fd, running_loop
     peer = writer.get_extra_info('peername')
-    print(f"[Bridge] New client connected from {peer}")
+    logging.info(f"[Bridge] New client connected from {peer}")
 
     # Perform WebSocket Handshake
     try:
@@ -123,7 +126,7 @@ async def handle_client(reader, writer):
         await writer.drain()
 
         clients.add(writer)
-        print(f"[Bridge] Handshake complete for {peer}")
+        logging.info(f"[Bridge] Handshake complete for {peer}")
 
         # Send initial status frame
         writer.write(make_frame("[Bridge] Connected to /tmp/printer WebSocket server\n"))
@@ -142,17 +145,24 @@ async def handle_client(reader, writer):
             for frame in frames:
                 cmd_text = frame.decode('utf-8', errors='ignore').strip()
                 if cmd_text:
-                    print(f"[Client -> Serial] {cmd_text}")
+                    logging.info(f"[Client -> Serial] {cmd_text}")
                     if serial_fd is not None:
                         try:
                             os.write(serial_fd, (cmd_text + "\n").encode('utf-8'))
                         except Exception as e:
-                            print(f"[Error writing to serial] {e}")
+                            logging.error(f"[Error writing to serial] {e}")
+                            if serial_fd is not None and running_loop is not None:
+                                try:
+                                    running_loop.remove_reader(serial_fd)
+                                    os.close(serial_fd)
+                                except Exception:
+                                    pass
+                                serial_fd = None
                     else:
-                        print("[Bridge Warning] /tmp/printer not currently open")
+                        logging.warning("[Bridge Warning] virtual serial device not currently open")
 
     except Exception as e:
-        print(f"[Client Error] {e}")
+        logging.error(f"[Client Error] {e}")
     finally:
         clients.discard(writer)
         try:
@@ -160,10 +170,10 @@ async def handle_client(reader, writer):
             await writer.wait_closed()
         except Exception:
             pass
-        print(f"[Bridge] Client disconnected: {peer}")
+        logging.info(f"[Bridge] Client disconnected: {peer}")
 
 def on_serial_readable():
-    global serial_fd
+    global serial_fd, running_loop
     if serial_fd is None:
         return
     try:
@@ -171,7 +181,7 @@ def on_serial_readable():
         if data:
             frame = make_frame(data)
             dead = set()
-            for w in clients:
+            for w in list(clients):
                 try:
                     w.write(frame)
                 except Exception:
@@ -179,44 +189,76 @@ def on_serial_readable():
             for d in dead:
                 clients.discard(d)
     except Exception as e:
-        print(f"[Serial Read Error] {e}")
+        logging.error(f"[Serial Read Error] {e}")
+        if serial_fd is not None and running_loop is not None:
+            try:
+                running_loop.remove_reader(serial_fd)
+                os.close(serial_fd)
+            except Exception:
+                pass
+            serial_fd = None
 
-def open_serial():
-    global serial_fd
-    if os.path.exists(SERIAL_PATH):
+def open_serial(serial_path=SERIAL_PATH):
+    global serial_fd, running_loop
+    if os.path.exists(serial_path):
         try:
-            serial_fd = os.open(SERIAL_PATH, os.O_RDWR | os.O_NONBLOCK)
-            print(f"[Bridge] Opened virtual serial device at {SERIAL_PATH}")
-            loop = asyncio.get_event_loop()
-            loop.add_reader(serial_fd, on_serial_readable)
+            serial_fd = os.open(serial_path, os.O_RDWR | os.O_NONBLOCK)
+            logging.info(f"[Bridge] Opened virtual serial device at {serial_path}")
+            running_loop = asyncio.get_running_loop()
+            running_loop.add_reader(serial_fd, on_serial_readable)
             return True
         except Exception as e:
-            print(f"[Bridge Error] Could not open {SERIAL_PATH}: {e}")
+            logging.error(f"[Bridge Error] Could not open {serial_path}: {e}")
     else:
-        print(f"[Bridge] {SERIAL_PATH} does not exist yet. Will keep monitoring...")
+        logging.info(f"[Bridge] {serial_path} does not exist yet. Will keep monitoring...")
     return False
 
-async def monitor_serial():
+async def monitor_serial(serial_path=SERIAL_PATH):
     global serial_fd
     while True:
         if serial_fd is None:
-            open_serial()
+            open_serial(serial_path)
         await asyncio.sleep(2)
 
-async def main():
-    print(f"Starting Klipper Web Bridge Server on ws://{HOST}:{PORT} ...")
-    open_serial()
+async def main(host=HOST, port=PORT, serial_path=SERIAL_PATH):
+    global running_loop
+    running_loop = asyncio.get_running_loop()
+    logging.info(f"Starting Klipper Web Bridge Server on ws://{host}:{port} ...")
+    open_serial(serial_path)
 
-    server = await asyncio.start_server(handle_client, HOST, PORT)
-    print(f"WebSocket bridge server running on ws://{HOST}:{PORT}")
+    server = await asyncio.start_server(handle_client, host, port)
+    logging.info(f"WebSocket bridge server running on ws://{host}:{port}")
 
-    asyncio.create_task(monitor_serial())
+    asyncio.create_task(monitor_serial(serial_path))
 
     async with server:
         await server.serve_forever()
 
+_bridge_thread = None
+
+def run_bridge_thread(host=HOST, port=PORT, serial_path=SERIAL_PATH):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(main(host, port, serial_path))
+    except Exception as e:
+        logging.error(f"[Bridge Error] {e}")
+
+def start_web_bridge(host=HOST, port=PORT, serial_path=SERIAL_PATH):
+    global _bridge_thread
+    if _bridge_thread is not None and _bridge_thread.is_alive():
+        return
+    _bridge_thread = threading.Thread(
+        target=run_bridge_thread,
+        args=(host, port, serial_path),
+        daemon=True,
+        name="WebBridgeThread"
+    )
+    _bridge_thread.start()
+
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nShutting down bridge server.")
+        logging.info("\nShutting down bridge server.")
