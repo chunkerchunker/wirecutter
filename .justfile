@@ -1,9 +1,12 @@
+setup:
+	uv add -r scripts/klippy-requirements.txt
+
 klippy:
-	.venv/bin/python klippy/klippy.py config/hotwire.cfg
+	uv run klippy/klippy.py config/hotwire.cfg
 
 serial:
-	.venv/bin/python -m serial.tools.miniterm --eol LF /tmp/printer
+	uv run python -m serial.tools.miniterm --eol LF /tmp/printer
 
 web-bridge:
-	.venv/bin/python scripts/web_bridge.py
+	uv run scripts/web_bridge.py
 

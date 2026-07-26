@@ -1,0 +1,19 @@
+[project]
+name = "wirecutter"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10, <3.13"
+dependencies = [
+    "greenlet==2.0.2 ; python_full_version < '3.12'",
+    "greenlet==3.1.1 ; python_full_version >= '3.12'",
+    "cffi==1.14.6 ; python_full_version < '3.12'",
+    "cffi==1.17.1 ; python_full_version >= '3.12'",
+    "jinja2==2.11.3",
+    "markupsafe==1.1.1",
+    "pyserial==3.4",
+    "python-can==3.3.4",
+    "setuptools==78.1.1 ; python_full_version >= '3.12'",
+    "msgspec==0.19.0 ; python_full_version >= '3.9'",
+]
+
