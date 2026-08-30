@@ -35,7 +35,8 @@ class Printer:
         self.run_result = None
         self.event_handlers = {}
         self.objects = collections.OrderedDict()
-        self.register_event_handler("klippy:ready", self._start_web_bridge)
+        if self.start_args.get('web'):
+            self.register_event_handler("klippy:ready", self._start_web_bridge)
         # Init printer components that must be setup prior to config
         for m in [gcode, webhooks]:
             m.add_early_printer_objects(self)
@@ -268,6 +269,8 @@ def arg_dictionary(option, opt_str, value, parser):
     parser.values.dictionary[key] = fname
 
 def main():
+    if '--web' in sys.argv:
+        sys.argv = [arg if arg != '-web' else '--web' for arg in sys.argv]
     usage = "%prog [options] <config file>"
     opts = optparse.OptionParser(usage)
     opts.add_option("-i", "--debuginput", dest="debuginput",
@@ -288,13 +291,16 @@ def main():
                     help="file to read for mcu protocol dictionary")
     opts.add_option("--import-test", action="store_true",
                     help="perform an import module test")
+    opts.add_option("--web", action="store_true", dest="web", default=False,
+                    help="start the web bridge")
     options, args = opts.parse_args()
     if options.import_test:
         import_test()
     if len(args) != 1:
         opts.error("Incorrect number of arguments")
     start_args = {'config_file': args[0], 'apiserver': options.apiserver,
-                  'start_reason': 'startup', 'inputtty': options.inputtty}
+                  'start_reason': 'startup', 'inputtty': options.inputtty,
+                  'web': options.web}
 
     debuglevel = logging.INFO
     if options.verbose:
