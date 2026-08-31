@@ -45,7 +45,7 @@
       flex-direction: column;
       align-items: center;
       gap: 20px;
-      max-width: 480px;
+      max-width: 780px;
       width: 100%;
     }
 
@@ -148,16 +148,15 @@
 
     /* Settings Bar with Speed & Distance Inputs */
     .settings-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-around;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      padding: 12px 16px;
+      padding: 14px 20px;
       border-radius: 14px;
       width: 100%;
       backdrop-filter: blur(10px);
-      gap: 12px;
+      gap: 16px;
     }
 
     .settings-column {
@@ -188,6 +187,18 @@
       padding: 1px 5px;
       border-radius: 4px;
       border: 1px solid rgba(59, 130, 246, 0.25);
+      transition: all 0.2s ease;
+    }
+
+    .pos-badge.clickable {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pos-badge.clickable:hover {
+      background: rgba(59, 130, 246, 0.35);
+      color: #93c5fd;
+      border-color: rgba(59, 130, 246, 0.5);
     }
 
     .setting-row {
@@ -270,16 +281,16 @@
 
     .panel {
       display: grid;
-      grid-template-columns: 100px 100px 100px;
+      grid-template-columns: 100px 100px 100px 100px;
       grid-template-rows: 60px 100px 100px;
       column-gap: 10px;
       row-gap: 0;
-      width: 320px;
+      width: 430px;
       height: 260px;
       grid-template-areas:
-        "knife-icon bed-icon ."
-        "knife-up   bed-up    home"
-        "knife-down bed-down  .";
+        "knife-icon bed-icon rotary-icon ."
+        "knife-up   bed-up   rotary-ccw  home"
+        "knife-down bed-down rotary-cw   .";
     }
 
     .icon-cell {
@@ -359,12 +370,20 @@
       grid-area: bed-icon;
     }
 
+    .ga-rotary-icon {
+      grid-area: rotary-icon;
+    }
+
     .ga-knife-up {
       grid-area: knife-up;
     }
 
     .ga-bed-up {
       grid-area: bed-up;
+    }
+
+    .ga-rotary-ccw {
+      grid-area: rotary-ccw;
     }
 
     .ga-home {
@@ -377,6 +396,10 @@
 
     .ga-bed-down {
       grid-area: bed-down;
+    }
+
+    .ga-rotary-cw {
+      grid-area: rotary-cw;
     }
 
     /* Terminal Log Section */
@@ -401,6 +424,37 @@
       color: var(--text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.05em;
+    }
+
+    .terminal-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .poll-toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      text-transform: none;
+      letter-spacing: normal;
+      font-weight: 500;
+    }
+
+    .poll-toggle-label:hover {
+      color: var(--text-primary);
+    }
+
+    .poll-toggle-label input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: var(--accent-color);
+      width: 13px;
+      height: 13px;
+      margin: 0;
     }
 
     .terminal-output {
@@ -464,6 +518,28 @@
     .terminal-send:hover {
       color: #fff;
       background: rgba(255, 255, 255, 0.1);
+    }
+
+    @media (max-width: 680px) {
+      .settings-bar {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        padding: 12px 14px;
+      }
+      .panel {
+        grid-template-columns: 80px 80px 80px 80px;
+        grid-template-rows: 50px 80px 80px;
+        width: 350px;
+        height: 210px;
+      }
+      .btn {
+        width: 80px;
+        height: 80px;
+      }
+      .btn svg {
+        width: 44px;
+        height: 44px;
+      }
     }
   </style>
 </head>
@@ -529,6 +605,27 @@
       </div>
 
       <div class="settings-column">
+        <div class="settings-column-title">
+          <span>Rotary (A)</span>
+          <span class="pos-badge clickable" id="pos-rotary-a" title="Click to zero position">0.0°</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Speed:</span>
+          <div class="input-with-unit">
+            <input type="number" id="feedrate-rotary" value="50" min="1" max="360" step="5">
+            <span class="unit">°/s</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Angle:</span>
+          <div class="input-with-unit">
+            <input type="number" id="distance-rotary" value="4" min="0.1" max="360" step="1">
+            <span class="unit">°</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-column">
         <div class="settings-column-title">Hotwire</div>
         <div class="setting-row">
           <span class="setting-label">PWM%:</span>
@@ -565,6 +662,15 @@
           </svg>
         </div>
 
+        <div class="icon-cell ga-rotary-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="16" stroke="currentColor" stroke-width="2.5" stroke-dasharray="5 3" />
+            <circle cx="24" cy="24" r="6" fill="currentColor" />
+            <path d="M24 2V8M24 40V46M2 24H8M40 24H46" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+          </svg>
+        </div>
+
         <button class="btn btn-up ga-knife-up" id="btn-knife-up" aria-label="Knife up">
           <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none"
             xmlns="http://www.w3.org/2000/svg">
@@ -579,6 +685,15 @@
             xmlns="http://www.w3.org/2000/svg">
             <path
               d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z"
+              fill="currentColor" />
+          </svg>
+        </button>
+
+        <button class="btn btn-up ga-rotary-ccw" id="btn-rotary-ccw" aria-label="Rotate counter-clockwise (CCW)">
+          <svg width="56" height="56" viewBox="0 0 48 48" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M22 6C13.1634 6 6 13.1634 6 22C6 30.8366 13.1634 38 22 38C28.2863 38 33.7206 34.3752 36.3268 29.1353C37.0401 27.6999 36.4384 25.9463 34.9942 25.2443C33.5501 24.5422 31.8087 25.1528 31.107 26.5947C29.2894 30.3308 25.867 32.75 22 32.75C16.063 32.75 11.25 27.937 11.25 22C11.25 16.063 16.063 11.25 22 11.25C25.4674 11.25 28.536 12.8943 30.4722 15.4411L26.5 19H38V7.5L34.2541 11.2459C31.2874 7.98634 26.897 6 22 6Z"
               fill="currentColor" />
           </svg>
         </button>
@@ -614,13 +729,30 @@
           </span>
         </button>
 
+        <button class="btn btn-down ga-rotary-cw" id="btn-rotary-cw" aria-label="Rotate clockwise (CW)">
+          <span style="display: inline-flex; transform: scaleX(-1);">
+            <svg width="56" height="56" viewBox="0 0 48 48" preserveAspectRatio="xMidYMid meet" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M22 6C13.1634 6 6 13.1634 6 22C6 30.8366 13.1634 38 22 38C28.2863 38 33.7206 34.3752 36.3268 29.1353C37.0401 27.6999 36.4384 25.9463 34.9942 25.2443C33.5501 24.5422 31.8087 25.1528 31.107 26.5947C29.2894 30.3308 25.867 32.75 22 32.75C16.063 32.75 11.25 27.937 11.25 22C11.25 16.063 16.063 11.25 22 11.25C25.4674 11.25 28.536 12.8943 30.4722 15.4411L26.5 19H38V7.5L34.2541 11.2459C31.2874 7.98634 26.897 6 22 6Z"
+                fill="currentColor" />
+            </svg>
+          </span>
+        </button>
+
       </div>
     </div>
 
     <div class="terminal-card">
       <div class="terminal-header">
         <span>Serial Terminal</span>
-        <span id="terminal-clear" style="cursor: pointer;">Clear</span>
+        <div class="terminal-actions">
+          <label class="poll-toggle-label" title="Enable/disable background M114 status polling">
+            <input type="checkbox" id="toggle-poll" checked>
+            <span>Status Polling</span>
+          </label>
+          <span id="terminal-clear" style="cursor: pointer;">Clear</span>
+        </div>
       </div>
       <div class="terminal-output" id="terminal-output">
         <div class="terminal-line system">Ready. Click Connect or Home button to link to /tmp/printer.</div>
@@ -658,11 +790,18 @@
     const knifeDownBtn = document.getElementById('btn-knife-down');
     const bedUpBtn = document.getElementById('btn-bed-up');
     const bedDownBtn = document.getElementById('btn-bed-down');
+    const rotaryCcwBtn = document.getElementById('btn-rotary-ccw');
+    const rotaryCwBtn = document.getElementById('btn-rotary-cw');
 
     const inputKnifeFeedrate = document.getElementById('feedrate-knife');
     const inputKnifeDistance = document.getElementById('distance-knife');
     const inputBedFeedrate = document.getElementById('feedrate-bed');
     const inputBedDistance = document.getElementById('distance-bed');
+    const inputRotaryFeedrate = document.getElementById('feedrate-rotary');
+    const inputRotaryDistance = document.getElementById('distance-rotary');
+
+    const posRotaryA = document.getElementById('pos-rotary-a');
+    let currentRotaryPos = 0.0;
 
     const inputHotwirePwm = document.getElementById('hotwire-pwm');
     const btnHotwireToggle = document.getElementById('hotwire-toggle');
@@ -677,6 +816,18 @@
       let speed = parseFloat(inputBedFeedrate.value) || 18000;
       let dist = Math.max(0.05, (speed / 60) * 0.08);
       inputBedDistance.value = dist >= 1 ? dist.toFixed(0) : dist.toFixed(2);
+    });
+
+    inputRotaryFeedrate.addEventListener('input', () => {
+      let speed = parseFloat(inputRotaryFeedrate.value) || 50;
+      let dist = Math.max(0.1, speed * 0.08);
+      inputRotaryDistance.value = dist >= 1 ? dist.toFixed(0) : dist.toFixed(1);
+    });
+
+    posRotaryA.addEventListener('click', async () => {
+      currentRotaryPos = 0.0;
+      posRotaryA.textContent = '0.0°';
+      await sendGcode('MANUAL_STEPPER STEPPER=stepper_a SET_POSITION=0');
     });
 
     async function updateHotwireState() {
@@ -905,14 +1056,36 @@
 
     // --- M114 POSITION POLLING ---
     let m114Timer = null;
+    let isPollingEnabled = true;
+    const togglePoll = document.getElementById('toggle-poll');
 
     function startM114Polling() {
-      if (m114Timer) return;
+      if (!isPollingEnabled || m114Timer) return;
       m114Timer = setInterval(() => {
-        if (isConnected() && !jogTimer) {
+        if (isPollingEnabled && isConnected() && !jogTimer) {
           sendGcode('M114', true);
         }
       }, 1000);
+    }
+
+    function stopM114Polling() {
+      if (m114Timer) {
+        clearInterval(m114Timer);
+        m114Timer = null;
+      }
+    }
+
+    if (togglePoll) {
+      togglePoll.addEventListener('change', () => {
+        isPollingEnabled = togglePoll.checked;
+        if (isPollingEnabled) {
+          startM114Polling();
+          logTerminal('Status polling enabled.', 'system');
+        } else {
+          stopM114Polling();
+          logTerminal('Status polling disabled.', 'system');
+        }
+      });
     }
 
     // --- PRESS & HOLD JOGGING LOGIC ---
@@ -929,6 +1102,37 @@
           stopJog();
           return;
         }
+      }
+
+      if (axis === 'A') {
+        let maxRate = 360;
+        let speed = parseFloat(inputRotaryFeedrate.value);
+        if (isNaN(speed) || speed <= 0) speed = 50;
+        speed = Math.min(speed, maxRate);
+
+        let stepDist = parseFloat(inputRotaryDistance.value);
+        if (isNaN(stepDist) || stepDist <= 0) {
+          stepDist = Math.max(0.1, speed * 0.08);
+        }
+
+        const delta = direction * stepDist;
+
+        const sendRotaryStep = async () => {
+          currentRotaryPos += delta;
+          if (posRotaryA) {
+            posRotaryA.textContent = `${currentRotaryPos.toFixed(1)}°`;
+          }
+          await sendGcode(`MANUAL_STEPPER STEPPER=stepper_a MOVE=${currentRotaryPos.toFixed(2)} SPEED=${speed.toFixed(1)}`);
+        };
+
+        await sendRotaryStep();
+
+        jogTimer = setInterval(() => {
+          if (pendingOks < 2) {
+            sendRotaryStep();
+          }
+        }, 100);
+        return;
       }
 
       // Get feedrate and distance for axis
@@ -1008,6 +1212,10 @@
     // Bed: Y Axis (Up: +1, Down: -1)
     attachJogEvents(bedUpBtn, 'Y', 1);
     attachJogEvents(bedDownBtn, 'Y', -1);
+
+    // Rotary: Stepper A (CCW: +1, CW: -1)
+    attachJogEvents(rotaryCcwBtn, 'A', 1);
+    attachJogEvents(rotaryCwBtn, 'A', -1);
 
     // Other Event Listeners
     connectBtn.addEventListener('click', () => {
