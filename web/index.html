@@ -541,6 +541,37 @@
         height: 44px;
       }
     }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      margin-bottom: 5px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    .tab-btn.active {
+      background: var(--accent-color);
+      border-color: var(--accent-color);
+    }
+    .tab-content {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .tab-content.active {
+      display: flex;
+    }
   </style>
 </head>
 
@@ -549,6 +580,12 @@
   <div class="app-container">
     <div class="header">
       <h1>Hotwire Cutter</h1>
+    </div>
+
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-btn-control">Control</button>
+      <button class="tab-btn" id="tab-btn-gcode">G-code</button>
     </div>
 
     <div class="status-bar">
@@ -561,6 +598,7 @@
       </div>
     </div>
 
+    <div id="tab-control" class="tab-content active">
     <div class="settings-bar">
       <div class="settings-column">
         <div class="settings-column-title">
@@ -740,6 +778,35 @@
           </span>
         </button>
 
+      </div>
+    </div>
+
+    </div> <!-- end tab-control -->
+
+    <div id="tab-gcode" class="tab-content">
+      <div class="panel-card" style="flex-direction: column; gap: 15px; width: 100%; box-sizing: border-box;">
+        <div class="settings-column-title" style="margin-bottom: 5px; border: none; font-size: 1.1rem; padding-bottom: 0;">G-code File Sender</div>
+        
+        <input type="file" id="gcode-file-input" accept=".gcode,.nc,.txt" style="color: var(--text-primary); padding: 10px 0;">
+        
+        <div id="gcode-info" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(0,0,0,0.25); padding: 12px; border-radius: 8px; min-height: 40px; border: 1px solid var(--card-border);">
+          No file loaded.
+        </div>
+
+        <label class="poll-toggle-label" style="margin-top: 5px;">
+          <input type="checkbox" id="gcode-home-cb" checked>
+          <span>Home before running (G28)</span>
+        </label>
+
+        <div style="display: flex; gap: 10px; margin-top: 5px;">
+          <button id="run-gcode-btn" class="connect-btn" style="flex: 1; padding: 12px;" disabled>Run G-code</button>
+          <button id="stop-gcode-btn" class="connect-btn" style="flex: 1; padding: 12px; background: rgba(239, 68, 68, 0.2); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.4);" disabled>Stop</button>
+        </div>
+
+        <div style="width: 100%; height: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; overflow: hidden; margin-top: 5px;">
+          <div id="gcode-progress-fill" style="width: 0%; height: 100%; background: var(--success-color); transition: width 0.2s;"></div>
+        </div>
+        <div id="gcode-status-text" style="font-size: 0.85rem; text-align: center; color: var(--text-secondary);">Ready</div>
       </div>
     </div>
 
@@ -1244,6 +1311,177 @@
 
     terminalClear.addEventListener('click', () => {
       terminalOutput.innerHTML = '';
+    });
+
+
+    // --- TABS LOGIC ---
+    const tabBtnControl = document.getElementById('tab-btn-control');
+    const tabBtnGcode = document.getElementById('tab-btn-gcode');
+    const tabControl = document.getElementById('tab-control');
+    const tabGcode = document.getElementById('tab-gcode');
+
+    function switchTab(tab) {
+      if (tab === 'control') {
+        tabBtnControl.classList.add('active');
+        tabBtnGcode.classList.remove('active');
+        tabControl.classList.add('active');
+        tabGcode.classList.remove('active');
+      } else {
+        tabBtnGcode.classList.add('active');
+        tabBtnControl.classList.remove('active');
+        tabGcode.classList.add('active');
+        tabControl.classList.remove('active');
+      }
+    }
+
+    tabBtnControl.addEventListener('click', () => switchTab('control'));
+    tabBtnGcode.addEventListener('click', () => switchTab('gcode'));
+
+    // --- G-CODE SENDER LOGIC ---
+    const gcodeFileInput = document.getElementById('gcode-file-input');
+    const gcodeInfo = document.getElementById('gcode-info');
+    const runGcodeBtn = document.getElementById('run-gcode-btn');
+    const stopGcodeBtn = document.getElementById('stop-gcode-btn');
+    const gcodeProgressFill = document.getElementById('gcode-progress-fill');
+    const gcodeStatusText = document.getElementById('gcode-status-text');
+    const gcodeHomeCb = document.getElementById('gcode-home-cb');
+
+    let gcodeLines = [];
+    let isRunningGcode = false;
+    let stopRequested = false;
+
+    gcodeFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) {
+        gcodeLines = [];
+        gcodeInfo.innerHTML = 'No file loaded.';
+        runGcodeBtn.disabled = true;
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target.result;
+        const lines = text.split('\n');
+        gcodeLines = [];
+        
+        let validLines = 0;
+        for (let line of lines) {
+          const stripped = line.split(';')[0].trim();
+          if (stripped) {
+            gcodeLines.append ? gcodeLines.append(stripped) : gcodeLines.push(stripped);
+            validLines++;
+          }
+        }
+
+        gcodeInfo.innerHTML = `
+          <strong>File:</strong> ${file.name} <br>
+          <strong>Size:</strong> ${(file.size / 1024).toFixed(2)} KB <br>
+          <strong>Commands:</strong> ${validLines}
+        `;
+
+        if (validLines > 0) {
+          runGcodeBtn.disabled = false;
+        } else {
+          runGcodeBtn.disabled = true;
+          gcodeInfo.innerHTML += '<br><span style="color: var(--danger-color);">No valid G-code commands found.</span>';
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    runGcodeBtn.addEventListener('click', async () => {
+      if (gcodeLines.length === 0 || isRunningGcode) return;
+      
+      if (!isConnected()) {
+        const ok = await connectBridge();
+        if (!ok) return;
+      }
+
+      isRunningGcode = true;
+      stopRequested = false;
+      runGcodeBtn.disabled = true;
+      stopGcodeBtn.disabled = false;
+      stopGcodeBtn.style.background = 'var(--danger-color)';
+      stopGcodeBtn.style.color = '#fff';
+
+      const linesToSend = [...gcodeLines];
+      if (gcodeHomeCb.checked) {
+        linesToSend.unshift('G28');
+      }
+
+      const total = linesToSend.length;
+      let sent = 0;
+      const startTime = performance.now();
+
+      gcodeProgressFill.style.width = '0%';
+      gcodeStatusText.textContent = `Starting...`;
+      
+      // Stop polling to reduce serial noise
+      const wasPolling = isPollingEnabled;
+      if (wasPolling && togglePoll) {
+         togglePoll.checked = false;
+         togglePoll.dispatchEvent(new Event('change'));
+      }
+
+      logTerminal(`--- Starting G-code file (${total} commands) ---`, 'system');
+
+      // Send a newline to clear buffer
+      await sendGcode('', true);
+
+      for (let i = 0; i < total; i++) {
+        if (stopRequested) {
+          logTerminal('--- G-code run aborted by user ---', 'error');
+          break;
+        }
+
+        // Wait if too many unacknowledged commands
+        while (pendingOks >= 2) {
+          await new Promise(r => setTimeout(r, 10));
+        }
+
+        const cmd = linesToSend[i];
+        if (cmd) {
+          await sendGcode(cmd, true); // silent send
+        }
+        sent++;
+
+        if (i % 5 === 0 || i === total - 1) {
+          const percent = ((sent / total) * 100).toFixed(1);
+          const elapsed = ((performance.now() - startTime) / 1000);
+          gcodeProgressFill.style.width = percent + '%';
+          gcodeStatusText.textContent = `Sent ${sent}/${total} (${percent}%) | Elapsed: ${elapsed.toFixed(1)}s`;
+        }
+      }
+
+      isRunningGcode = false;
+      runGcodeBtn.disabled = false;
+      stopGcodeBtn.disabled = true;
+      stopGcodeBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+      stopGcodeBtn.style.color = 'var(--danger-color)';
+
+      if (!stopRequested) {
+        gcodeStatusText.textContent = `Finished in ${((performance.now() - startTime) / 1000).toFixed(1)}s`;
+        logTerminal('--- G-code run completed ---', 'system');
+      }
+      
+      // Restore polling
+      if (wasPolling && togglePoll) {
+         togglePoll.checked = true;
+         togglePoll.dispatchEvent(new Event('change'));
+      }
+    });
+
+    stopGcodeBtn.addEventListener('click', () => {
+      if (isRunningGcode) {
+        stopRequested = true;
+        stopGcodeBtn.textContent = 'Stopping...';
+        stopGcodeBtn.disabled = true;
+        // sendGcode('M112', true);  just in case, though maybe just stopping loop is enough.
+        // Actually for Klipper M112 will shutdown the MCU requiring a FIRMWARE_RESTART. 
+        // We will just stop sending to the queue. 
+        logTerminal('Stop requested...', 'system');
+      }
     });
 
     // Attempt auto-connecting to bridge on load & start M114 polling
