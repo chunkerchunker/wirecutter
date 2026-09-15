@@ -1,9 +1,2 @@
 tmp
 .DS_Store
-
-out
-*.so
-*.pyc
-.config
-.config.old
-klippy/.version
