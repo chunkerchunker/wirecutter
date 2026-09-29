@@ -1,0 +1,2279 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotwire Cutter - FluidNC Control</title>
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #1e2024 0%, #121316 100%);
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-primary: #f0f4f8;
+      --text-secondary: #94a3b8;
+      --accent-color: #3b82f6;
+      --accent-hover: #2563eb;
+      --success-color: #10b981;
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+      --btn-bg: rgba(255, 255, 255, 0.07);
+      --btn-hover: rgba(255, 255, 255, 0.15);
+      --btn-active: rgba(59, 130, 246, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100vh;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 12px 20px 20px;
+    }
+
+    html {
+      padding: 0;
+    }
+
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      max-width: 780px;
+      width: 100%;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .header h1 {
+      margin: 0 0 4px 0;
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--danger-color);
+      box-shadow: 0 0 8px var(--danger-color);
+      transition: background-color 0.3s, box-shadow 0.3s;
+    }
+
+    .dot.connected {
+      background-color: var(--success-color);
+      box-shadow: 0 0 8px var(--success-color);
+    }
+
+    .dot.connecting {
+      background-color: var(--warning-color);
+      box-shadow: 0 0 8px var(--warning-color);
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from {
+        opacity: 0.4;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* Connection icon + popover */
+    .conn {
+      position: relative;
+    }
+
+    .conn-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--danger-color);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.3s;
+    }
+
+    .conn-icon:hover,
+    .conn-icon[aria-expanded="true"] {
+      background: var(--btn-bg);
+      border-color: var(--card-border);
+    }
+
+    .conn-icon.connected {
+      color: var(--success-color);
+    }
+
+    .conn-icon.connecting {
+      color: var(--warning-color);
+      animation: pulse 1s infinite alternate;
+    }
+
+    .conn-icon.alarm {
+      color: var(--warning-color);
+    }
+
+    .conn-tooltip {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 20;
+    }
+
+    .conn-icon:hover + .conn-tooltip {
+      opacity: 1;
+    }
+
+    .conn[data-open] .conn-tooltip {
+      display: none;
+    }
+
+    .conn-popup {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: 260px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+      background: #1a1c20;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+      z-index: 30;
+    }
+
+    .conn-popup[hidden] {
+      display: none;
+    }
+
+    .conn-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .conn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .host-input {
+      flex: 1;
+      min-width: 0;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 7px 10px;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .host-input:focus {
+      border-color: var(--accent-color);
+    }
+
+    .connect-btn {
+      background: var(--accent-color);
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .connect-btn:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .connect-btn.connected {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger-color);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .connect-btn.connected:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
+    /* Settings Bar with Speed & Distance Inputs */
+    .settings-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 14px 20px;
+      border-radius: 14px;
+      width: 100%;
+      backdrop-filter: blur(10px);
+      gap: 16px;
+    }
+
+    .settings-column {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .settings-column-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 4px;
+      margin-bottom: 2px;
+      min-height: 44px;
+    }
+
+    /* Machine (M) over work (W) position readouts */
+    .pos-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .pos-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .pos-tag {
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      opacity: 0.7;
+    }
+
+    .pos-badge {
+      min-width: 62px;
+      text-align: right;
+      font-family: "JetBrains Mono", "Fira Code", Monaco, monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #60a5fa;
+      background: rgba(59, 130, 246, 0.15);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      transition: all 0.2s ease;
+    }
+
+    .pos-badge.machine {
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .pos-badge {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pos-badge:hover {
+      background: rgba(59, 130, 246, 0.35);
+      color: #93c5fd;
+      border-color: rgba(59, 130, 246, 0.5);
+    }
+
+    /* Move-to-position popover, opened from a position readout */
+    .move-popup {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      background: #1a1c20;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+      z-index: 30;
+    }
+
+    .move-popup[hidden] {
+      display: none;
+    }
+
+    .move-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .move-popup .input-with-unit input {
+      width: 110px;
+    }
+
+    .move-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .move-cancel {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--card-border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .move-cancel:hover {
+      color: var(--text-primary);
+      background: var(--btn-bg);
+    }
+
+    .axis-head {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .axis-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .axis-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 18px;
+      padding: 0;
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      background: var(--btn-bg);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .axis-btn:hover:not(:disabled) {
+      background: var(--btn-hover);
+      color: var(--text-primary);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .axis-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .setting-label {
+      font-weight: 500;
+    }
+
+    .input-with-unit {
+      display: flex;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 3px 6px;
+    }
+
+    .input-with-unit input {
+      width: 48px;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-align: right;
+      outline: none;
+      -moz-appearance: textfield;
+    }
+
+    .input-with-unit input::-webkit-outer-spin-button,
+    .input-with-unit input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .input-with-unit .unit {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-left: 3px;
+    }
+
+    .toggle-btn {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger-color);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .toggle-btn.active {
+      background: rgba(16, 185, 129, 0.25);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .panel-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .panel {
+      display: grid;
+      grid-template-columns: 100px 100px 100px 100px;
+      grid-template-rows: 60px 100px 100px;
+      column-gap: 10px;
+      row-gap: 0;
+      width: 430px;
+      height: 260px;
+      grid-template-areas:
+        "knife-icon bed-icon rotary-icon ."
+        "knife-up   bed-up   rotary-ccw  home"
+        "knife-down bed-down rotary-cw   stop";
+    }
+
+    .icon-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      padding-bottom: 8px;
+    }
+
+    .icon-cell svg path {
+      fill: #cbd5e1;
+    }
+
+    .btn {
+      border: 1px solid var(--card-border);
+      padding: 0;
+      font: inherit;
+      cursor: pointer;
+      width: 100px;
+      height: 100px;
+      background: var(--btn-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: all 0.15s ease-in-out;
+      outline: none;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    .btn svg path {
+      fill: #f1f5f9;
+      transition: fill 0.2s ease;
+    }
+
+    .btn:hover {
+      background: var(--btn-hover);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .btn:active,
+    .btn.active-press {
+      transform: scale(0.96);
+      background: var(--btn-active);
+      border-color: var(--accent-color);
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-up {
+      border-radius: 10px 10px 0 0;
+      box-shadow: inset 0 5px 5px rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-down {
+      border-radius: 0 0 10px 10px;
+      box-shadow: 0 5px 2.5px rgba(0, 0, 0, 0.25);
+      border-top: 1px solid rgba(0, 0, 0, 0.3);
+    }
+
+    .btn-home {
+      border-radius: 10px;
+      box-shadow: 0 5px 5px rgba(0, 0, 0, 0.25), inset 0 5px 5px rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-home:hover svg path {
+      fill: #60a5fa;
+    }
+
+    .ga-knife-icon {
+      grid-area: knife-icon;
+    }
+
+    .ga-bed-icon {
+      grid-area: bed-icon;
+    }
+
+    .ga-rotary-icon {
+      grid-area: rotary-icon;
+    }
+
+    .ga-knife-up {
+      grid-area: knife-up;
+    }
+
+    .ga-bed-up {
+      grid-area: bed-up;
+    }
+
+    .ga-rotary-ccw {
+      grid-area: rotary-ccw;
+    }
+
+    .ga-home {
+      grid-area: home;
+    }
+
+    .ga-knife-down {
+      grid-area: knife-down;
+    }
+
+    .ga-bed-down {
+      grid-area: bed-down;
+    }
+
+    .ga-rotary-cw {
+      grid-area: rotary-cw;
+    }
+
+    .ga-stop {
+      grid-area: stop;
+    }
+
+    .btn.btn-stop {
+      align-self: end;
+      height: calc(100% - 10px);
+      flex-direction: column;
+      gap: 4px;
+      border-radius: 10px;
+      border-color: rgba(239, 68, 68, 0.4);
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger-color);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .btn.btn-stop svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .btn-stop svg rect {
+      fill: var(--danger-color);
+    }
+
+    .btn-stop:hover {
+      background: rgba(239, 68, 68, 0.3);
+      border-color: rgba(239, 68, 68, 0.7);
+    }
+
+    .btn-stop:active {
+      background: rgba(239, 68, 68, 0.45);
+      border-color: var(--danger-color);
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Terminal Log Section */
+    .terminal-card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--card-border);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .terminal-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .poll-toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      text-transform: none;
+      letter-spacing: normal;
+      font-weight: 500;
+    }
+
+    .poll-toggle-label:hover {
+      color: var(--text-primary);
+    }
+
+    .poll-toggle-label input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: var(--accent-color);
+      width: 13px;
+      height: 13px;
+      margin: 0;
+    }
+
+    .terminal-output {
+      height: 120px;
+      padding: 10px 14px;
+      font-family: "JetBrains Mono", "Fira Code", Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      overflow-y: auto;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .terminal-line {
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+
+    .terminal-line.sent {
+      color: #60a5fa;
+      font-weight: 600;
+    }
+
+    .terminal-line.error {
+      color: #f87171;
+    }
+
+    .terminal-line.system {
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    .terminal-input-bar {
+      display: flex;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .terminal-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 8px 12px;
+      color: #fff;
+      font-family: monospace;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .terminal-send {
+      background: rgba(255, 255, 255, 0.05);
+      border: none;
+      border-left: 1px solid var(--card-border);
+      color: var(--text-secondary);
+      padding: 0 12px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .terminal-send:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    @media (max-width: 680px) {
+      .settings-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        padding: 12px 14px;
+      }
+      .panel {
+        grid-template-columns: 80px 80px 80px 80px;
+        grid-template-rows: 50px 80px 80px;
+        width: 350px;
+        height: 210px;
+      }
+      .btn {
+        width: 80px;
+        height: 80px;
+      }
+      .btn svg {
+        width: 44px;
+        height: 44px;
+      }
+    }
+
+    /* Phones: tighten gutters and shrink the jog grid to fit ~360px screens */
+    @media (max-width: 480px) {
+      html,
+      body {
+        padding: 8px 10px 16px;
+      }
+      html {
+        padding: 0;
+      }
+      .settings-bar {
+        padding: 10px;
+        gap: 10px;
+      }
+      .panel-card {
+        padding: 14px 8px;
+      }
+      .panel {
+        grid-template-columns: repeat(4, 70px);
+        grid-template-rows: 44px 70px 70px;
+        column-gap: 8px;
+        width: auto;
+        height: auto;
+      }
+      .btn {
+        width: 70px;
+        height: 70px;
+      }
+      .btn svg {
+        width: 38px;
+        height: 38px;
+      }
+      .icon-cell svg {
+        width: 40px;
+        height: 40px;
+      }
+    }
+
+    /* G-code file drop zone (also clickable to open the file picker) */
+    .drop-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 22px 16px;
+      border: 1.5px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.15);
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .drop-zone:hover,
+    .drop-zone:focus-within {
+      border-color: rgba(255, 255, 255, 0.35);
+      color: var(--text-primary);
+    }
+
+    .drop-zone.dragover {
+      border-color: var(--accent-color);
+      background: rgba(59, 130, 246, 0.12);
+      color: var(--text-primary);
+    }
+
+    .drop-zone strong {
+      color: #60a5fa;
+      font-weight: 600;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    /* View switch + machine state actions row */
+    .view-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .machine-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .mach-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .mach-btn:hover {
+      background: var(--btn-bg);
+      color: var(--text-primary);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .mach-btn.attention {
+      color: var(--warning-color);
+      border-color: rgba(245, 158, 11, 0.6);
+      background: rgba(245, 158, 11, 0.12);
+    }
+
+    /* Segmented control for switching the Control / G-code panels */
+    .view-switch {
+      display: inline-flex;
+      padding: 3px;
+      gap: 2px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--card-border);
+      border-radius: 999px;
+    }
+
+    .view-switch button {
+      padding: 5px 16px;
+      border: none;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .view-switch button:hover {
+      color: var(--text-primary);
+    }
+
+    .view-switch button[aria-selected="true"] {
+      background: var(--btn-hover);
+      color: var(--text-primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    .tab-content {
+      display: none;
+      width: 100%;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .tab-content.active {
+      display: flex;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app-container">
+    <div class="header">
+      <h1>Hotwire Cutter</h1>
+      <div class="conn" id="conn">
+        <button type="button" class="conn-icon" id="conn-icon" aria-label="Connection" aria-haspopup="dialog"
+          aria-expanded="false" aria-controls="conn-popup">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 8.5a15 15 0 0 1 20 0" />
+            <path d="M5.5 12.5a10 10 0 0 1 13 0" />
+            <path d="M9 16.2a5 5 0 0 1 6 0" />
+            <circle cx="12" cy="19.5" r="0.8" fill="currentColor" />
+          </svg>
+        </button>
+        <span class="conn-tooltip" id="conn-tooltip" role="tooltip">Disconnected</span>
+        <div class="conn-popup" id="conn-popup" role="dialog" aria-label="Connection" hidden>
+          <div class="conn-status">
+            <span class="dot" id="status-dot"></span>
+            <span id="status-text">Disconnected</span>
+          </div>
+          <div class="conn-row">
+            <input type="text" class="host-input" id="host-input" value="hotwire.local" spellcheck="false"
+              autocomplete="off" title="FluidNC host[:port]" aria-label="Host">
+            <button class="connect-btn" id="connect-btn">Connect</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+    <div class="settings-bar">
+      <div class="settings-column">
+        <div class="settings-column-title">
+          <div class="axis-head">
+            <span>Knife (Z)</span>
+            <div class="axis-actions">
+              <button type="button" class="axis-btn" data-home="Z" title="Home Z ($HZ)" aria-label="Home Z" disabled><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3 2 11.5h3V21h5.5v-6h3v6H19v-9.5h3z"/></svg></button>
+              <button type="button" class="axis-btn" data-zero="knife" title="Zero Z work position" aria-label="Zero Z work position"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+            </div>
+          </div>
+          <span class="pos-stack">
+            <span class="pos-row" title="Machine position (click to move)"><span class="pos-tag">M</span><span class="pos-badge machine" id="pos-knife-z-m">0.00mm</span></span>
+            <span class="pos-row" title="Work position (click to move)"><span class="pos-tag">W</span><span class="pos-badge" id="pos-knife-z-w">0.00mm</span></span>
+          </span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Speed:</span>
+          <div class="input-with-unit">
+            <input type="number" id="feedrate-knife" value="6500" min="10" max="6500" step="100">
+            <span class="unit">mm/m</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Distance:</span>
+          <div class="input-with-unit">
+            <input type="number" id="distance-knife" value="10" min="0.01" max="100" step="0.05">
+            <span class="unit">mm</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-column">
+        <div class="settings-column-title">
+          <div class="axis-head">
+            <span>Bed (Y)</span>
+            <div class="axis-actions">
+              <button type="button" class="axis-btn" data-home="Y" title="Home Y ($HY)" aria-label="Home Y" disabled><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3 2 11.5h3V21h5.5v-6h3v6H19v-9.5h3z"/></svg></button>
+              <button type="button" class="axis-btn" data-zero="bed" title="Zero Y work position" aria-label="Zero Y work position"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+            </div>
+          </div>
+          <span class="pos-stack">
+            <span class="pos-row" title="Machine position (click to move)"><span class="pos-tag">M</span><span class="pos-badge machine" id="pos-bed-y-m">0.00mm</span></span>
+            <span class="pos-row" title="Work position (click to move)"><span class="pos-tag">W</span><span class="pos-badge" id="pos-bed-y-w">0.00mm</span></span>
+          </span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Speed:</span>
+          <div class="input-with-unit">
+            <input type="number" id="feedrate-bed" value="6500" min="100" max="6500" step="100">
+            <span class="unit">mm/m</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Distance:</span>
+          <div class="input-with-unit">
+            <input type="number" id="distance-bed" value="10" min="0.1" max="500" step="1">
+            <span class="unit">mm</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-column">
+        <div class="settings-column-title">
+          <div class="axis-head">
+            <span>Rotary (A)</span>
+            <div class="axis-actions">
+              <button type="button" class="axis-btn" data-home="A" title="Home A ($HA)" aria-label="Home A" disabled><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3 2 11.5h3V21h5.5v-6h3v6H19v-9.5h3z"/></svg></button>
+              <button type="button" class="axis-btn" data-zero="rotary" title="Zero A work position" aria-label="Zero A work position"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+            </div>
+          </div>
+          <span class="pos-stack">
+            <span class="pos-row" title="Machine position (click to move)"><span class="pos-tag">M</span><span class="pos-badge machine" id="pos-rotary-a-m">0.0°</span></span>
+            <span class="pos-row" title="Work position (click to move)"><span class="pos-tag">W</span><span class="pos-badge" id="pos-rotary-a-w">0.0°</span></span>
+          </span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Speed:</span>
+          <div class="input-with-unit">
+            <input type="number" id="feedrate-rotary" value="209" min="1" max="209" step="5">
+            <span class="unit">°/s</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Angle:</span>
+          <div class="input-with-unit">
+            <input type="number" id="distance-rotary" value="1" min="0.1" max="360" step="1">
+            <span class="unit">°</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-column">
+        <div class="settings-column-title">Hotwire</div>
+        <div class="setting-row">
+          <span class="setting-label">PWM%:</span>
+          <div class="input-with-unit">
+            <input type="number" id="hotwire-pwm" value="4" min="0" max="100" step="1">
+            <span class="unit">%</span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Power:</span>
+          <button type="button" class="toggle-btn" id="hotwire-toggle">OFF</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="view-row">
+      <div class="view-switch" role="tablist" aria-label="View">
+        <button type="button" role="tab" id="tab-btn-control" aria-selected="true" aria-controls="tab-control">Control</button>
+        <button type="button" role="tab" id="tab-btn-gcode" aria-selected="false" aria-controls="tab-gcode">G-code</button>
+      </div>
+      <div class="machine-actions">
+        <button type="button" class="mach-btn" id="btn-unlock" title="Clear alarm lock ($X)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>Unlock</button>
+        <button type="button" class="mach-btn" id="btn-reset" title="Soft reset (Ctrl-X)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
+        <button type="button" class="mach-btn" id="btn-sleep" title="Disable motors ($SLP); reset to wake"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>Sleep</button>
+      </div>
+    </div>
+
+    <div id="tab-control" class="tab-content active" role="tabpanel">
+    <div class="panel-card">
+      <div class="panel">
+
+        <div class="icon-cell ga-knife-icon">
+          <svg width="60" height="60" viewBox="0 0 48.1699 45.1296" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd"
+              d="M2.1132 43.5467C1.6136 43.3799 1.16488 43.0883 0.809578 42.6995C0.454279 42.3106 0.204175 41.8375 0.0829805 41.3249C-0.0382143 40.8124 -0.0264842 40.2773 0.117059 39.7706C0.260602 39.2638 0.531201 38.8021 0.9032 38.4292L38.2357 1.0967C38.9388 0.394448 39.8919 0 40.8857 0C41.8795 0 42.8326 0.394448 43.5357 1.0967L47.0732 4.6342C47.7755 5.33733 48.1699 6.29045 48.1699 7.2842C48.1699 8.27795 47.7755 9.23107 47.0732 9.9342L35.5832 21.4267L40.4032 26.2467C40.7101 26.5538 40.9497 26.9215 41.1066 27.3263C41.2636 27.7312 41.3344 28.1643 41.3146 28.598C41.2949 29.0317 41.185 29.4566 40.9919 29.8455C40.7988 30.2344 40.5268 30.5788 40.1932 30.8567L31.6532 37.9717C27.6111 41.3387 22.7763 43.618 17.6069 44.5936C12.4374 45.5692 7.10443 45.2089 2.1132 43.5467Z"
+              fill="currentColor" />
+          </svg>
+        </div>
+
+        <div class="icon-cell ga-bed-icon">
+          <svg width="60" height="60" viewBox="0 0 20 13.9989" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" clip-rule="evenodd"
+              d="M1 0C1.24493 3.23106e-05 1.48134 0.089956 1.66437 0.252715C1.84741 0.415474 1.96434 0.639749 1.993 0.883L2 1V8H9V3C9.00003 2.75507 9.08996 2.51866 9.25272 2.33563C9.41547 2.15259 9.63975 2.03566 9.883 2.007L10 2H17C17.7652 1.99996 18.5015 2.29233 19.0583 2.81728C19.615 3.34224 19.9501 4.06011 19.995 4.824L20 5V13C19.9997 13.2549 19.9021 13.5 19.7272 13.6854C19.5522 13.8707 19.313 13.9822 19.0586 13.9972C18.8042 14.0121 18.5536 13.9293 18.3582 13.7657C18.1627 13.6021 18.0371 13.3701 18.007 13.117L18 13V10H2V13C1.99972 13.2549 1.90212 13.5 1.72715 13.6854C1.55218 13.8707 1.31305 13.9822 1.05861 13.9972C0.804163 14.0121 0.553621 13.9293 0.358167 13.7657C0.162714 13.6021 0.0371036 13.3701 0.00699997 13.117L0 13V1C0 0.734784 0.105357 0.48043 0.292893 0.292893C0.48043 0.105357 0.734784 0 1 0ZM5.5 2C6.16304 2 6.79893 2.26339 7.26777 2.73223C7.73661 3.20107 8 3.83696 8 4.5C8 5.16304 7.73661 5.79893 7.26777 6.26777C6.79893 6.73661 6.16304 7 5.5 7C4.83696 7 4.20107 6.73661 3.73223 6.26777C3.26339 5.79893 3 5.16304 3 4.5C3 3.83696 3.26339 3.20107 3.73223 2.73223C4.20107 2.26339 4.83696 2 5.5 2Z"
+              fill="currentColor" />
+          </svg>
+        </div>
+
+        <div class="icon-cell ga-rotary-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <circle cx="24" cy="24" r="16" stroke="currentColor" stroke-width="2.5" stroke-dasharray="5 3" />
+            <circle cx="24" cy="24" r="6" fill="currentColor" />
+            <path d="M24 2V8M24 40V46M2 24H8M40 24H46" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+          </svg>
+        </div>
+
+        <button class="btn btn-up ga-knife-up" id="btn-knife-up" aria-label="Knife up">
+          <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z"
+              fill="currentColor" />
+          </svg>
+        </button>
+
+        <button class="btn btn-up ga-bed-up" id="btn-bed-up" aria-label="Bed up">
+          <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z"
+              fill="currentColor" />
+          </svg>
+        </button>
+
+        <button class="btn btn-up ga-rotary-ccw" id="btn-rotary-ccw" aria-label="Rotate counter-clockwise (CCW)">
+          <svg width="56" height="56" viewBox="0 0 48 48" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M22 6C13.1634 6 6 13.1634 6 22C6 30.8366 13.1634 38 22 38C28.2863 38 33.7206 34.3752 36.3268 29.1353C37.0401 27.6999 36.4384 25.9463 34.9942 25.2443C33.5501 24.5422 31.8087 25.1528 31.107 26.5947C29.2894 30.3308 25.867 32.75 22 32.75C16.063 32.75 11.25 27.937 11.25 22C11.25 16.063 16.063 11.25 22 11.25C25.4674 11.25 28.536 12.8943 30.4722 15.4411L26.5 19H38V7.5L34.2541 11.2459C31.2874 7.98634 26.897 6 22 6Z"
+              fill="currentColor" />
+          </svg>
+        </button>
+
+        <button class="btn btn-home ga-home" id="btn-home" aria-label="Home">
+          <svg width="60" height="60" viewBox="0 0 50 53.75" preserveAspectRatio="xMidYMid meet" fill="none"
+            xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M5 38.75V16.25C5 15.4583 5.1775 14.7083 5.5325 14C5.8875 13.2917 6.37667 12.7083 7 12.25L22 1C22.875 0.333334 23.875 0 25 0C26.125 0 27.125 0.333334 28 1L43 12.25C43.625 12.7083 44.115 13.2917 44.47 14C44.825 14.7083 45.0017 15.4583 45 16.25V38.75C45 40.125 44.51 41.3025 43.53 42.2825C42.55 43.2625 41.3733 43.7517 40 43.75H32.5C31.7917 43.75 31.1983 43.51 30.72 43.03C30.2417 42.55 30.0017 41.9567 30 41.25V28.75C30 28.0417 29.76 27.4483 29.28 26.97C28.8 26.4917 28.2067 26.2517 27.5 26.25H22.5C21.7917 26.25 21.1983 26.49 20.72 26.97C20.2417 27.45 20.0017 28.0433 20 28.75V41.25C20 41.9583 19.76 42.5525 19.28 43.0325C18.8 43.5125 18.2067 43.7517 17.5 43.75H10C8.625 43.75 7.44833 43.2608 6.47 42.2825C5.49167 41.3042 5.00167 40.1267 5 38.75Z"
+              fill="currentColor" />
+          </svg>
+        </button>
+
+        <button class="btn btn-down ga-knife-down" id="btn-knife-down" aria-label="Knife down">
+          <span style="display: inline-flex; transform: rotate(180deg);">
+            <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z"
+                fill="currentColor" />
+            </svg>
+          </span>
+        </button>
+
+        <button class="btn btn-down ga-bed-down" id="btn-bed-down" aria-label="Bed down">
+          <span style="display: inline-flex; transform: rotate(180deg);">
+            <svg width="60" height="60" viewBox="0 0 54.6559 50" preserveAspectRatio="xMidYMid meet" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M22.9978 2.5C24.9223 -0.833334 29.7336 -0.833333 31.6581 2.5L48.9786 32.5C50.9031 35.8333 48.4975 40 44.6485 40H10.0075C6.15846 40 3.75283 35.8333 5.67733 32.5L22.9978 2.5Z"
+                fill="currentColor" />
+            </svg>
+          </span>
+        </button>
+
+        <button class="btn btn-down ga-rotary-cw" id="btn-rotary-cw" aria-label="Rotate clockwise (CW)">
+          <span style="display: inline-flex; transform: scaleX(-1);">
+            <svg width="56" height="56" viewBox="0 0 48 48" preserveAspectRatio="xMidYMid meet" fill="none"
+              xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M22 6C13.1634 6 6 13.1634 6 22C6 30.8366 13.1634 38 22 38C28.2863 38 33.7206 34.3752 36.3268 29.1353C37.0401 27.6999 36.4384 25.9463 34.9942 25.2443C33.5501 24.5422 31.8087 25.1528 31.107 26.5947C29.2894 30.3308 25.867 32.75 22 32.75C16.063 32.75 11.25 27.937 11.25 22C11.25 16.063 16.063 11.25 22 11.25C25.4674 11.25 28.536 12.8943 30.4722 15.4411L26.5 19H38V7.5L34.2541 11.2459C31.2874 7.98634 26.897 6 22 6Z"
+                fill="currentColor" />
+            </svg>
+          </span>
+        </button>
+
+        <button class="btn btn-stop ga-stop" id="btn-stop" aria-label="Stop all motion" title="Stop all motion">
+          <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" /></svg>
+          STOP
+        </button>
+
+      </div>
+    </div>
+
+    </div> <!-- end tab-control -->
+
+    <div id="tab-gcode" class="tab-content" role="tabpanel">
+      <div class="panel-card" style="flex-direction: column; gap: 15px; width: 100%; box-sizing: border-box;">
+        <div class="settings-column-title" style="margin-bottom: 5px; border: none; font-size: 1.1rem; padding-bottom: 0;">G-code File Sender</div>
+        
+        <label class="drop-zone" id="gcode-drop-zone">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" />
+            <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+          </svg>
+          <span>Drop a G-code file here, or <strong>choose a file</strong></span>
+          <input type="file" id="gcode-file-input" class="visually-hidden" accept=".gcode,.nc,.txt">
+        </label>
+        
+        <div id="gcode-info" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(0,0,0,0.25); padding: 12px; border-radius: 8px; min-height: 40px; border: 1px solid var(--card-border);">
+          No file loaded.
+        </div>
+
+        <label class="poll-toggle-label" style="margin-top: 5px;">
+          <input type="checkbox" id="gcode-home-cb" checked>
+          <span>Home before running ($H)</span>
+        </label>
+
+        <div style="display: flex; gap: 10px; margin-top: 5px;">
+          <button id="run-gcode-btn" class="connect-btn" style="flex: 1; padding: 12px;" disabled>Run G-code</button>
+          <button id="stop-gcode-btn" class="connect-btn" style="flex: 1; padding: 12px; background: rgba(239, 68, 68, 0.2); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.4);" disabled>Stop</button>
+        </div>
+
+        <div style="width: 100%; height: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; overflow: hidden; margin-top: 5px;">
+          <div id="gcode-progress-fill" style="width: 0%; height: 100%; background: var(--success-color); transition: width 0.2s;"></div>
+        </div>
+        <div id="gcode-status-text" style="font-size: 0.85rem; text-align: center; color: var(--text-secondary);">Ready</div>
+      </div>
+    </div>
+
+    <div class="move-popup" id="move-popup" role="dialog" aria-labelledby="move-title" hidden>
+      <div class="move-title" id="move-title">Move</div>
+      <div class="input-with-unit">
+        <input type="number" id="move-input" step="any" aria-labelledby="move-title">
+        <span class="unit" id="move-unit">mm</span>
+      </div>
+      <div class="move-actions">
+        <button type="button" class="move-cancel" id="move-cancel">Cancel</button>
+        <button type="button" class="connect-btn" id="move-go">Move</button>
+      </div>
+    </div>
+
+    <div class="terminal-card">
+      <div class="terminal-header">
+        <span>Terminal</span>
+        <div class="terminal-actions">
+          <label class="poll-toggle-label" title="Enable/disable background ? status polling">
+            <input type="checkbox" id="toggle-poll" checked>
+            <span>Status Polling</span>
+          </label>
+          <span id="terminal-clear" style="cursor: pointer;">Clear</span>
+        </div>
+      </div>
+      <div class="terminal-output" id="terminal-output">
+        <div class="terminal-line system">Ready. Click Connect to link to the FluidNC controller.</div>
+      </div>
+      <form class="terminal-input-bar" id="terminal-form">
+        <input type="text" class="terminal-input" id="terminal-input" placeholder="Send G-code command..."
+          autocomplete="off">
+        <button type="submit" class="terminal-send">Send</button>
+      </form>
+    </div>
+
+  </div>
+
+  <script>
+    // FluidNC (v4) serves its WebSocket at "/" on the HTTP port, the same endpoint
+    // ESP3D-WEBUI uses. Output arrives as binary frames; text frames are control
+    // messages (currentID:, PING:, ...). When this page is served by the
+    // controller itself, default to that host.
+    const DEFAULT_HOST = location.protocol.startsWith('http') && location.hostname ? location.host : 'hotwire.local';
+
+    // FluidNC realtime commands (single bytes, no newline, no "ok" response)
+    const RT_STATUS = '?';
+    const RT_JOG_CANCEL = '\x85';
+    const RT_FEED_HOLD = '!';
+    const RT_RESET = '\x18';
+
+    let ws = null;
+    let isConnecting = false;
+    let pendingOks = 0;
+    let rxBuffer = '';
+    let rxDecoder = new TextDecoder();
+
+    let activeBtn = null;
+    let holdTimer = null;
+    let isHoldJogging = false;
+    const HOLD_MS = 250;           // press longer than this => continuous jog until release
+    const CONTINUOUS_JOG = 1000;   // jog distance for press-and-hold; cancelled on release
+
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const connectBtn = document.getElementById('connect-btn');
+    const hostInput = document.getElementById('host-input');
+    const connWrap = document.getElementById('conn');
+    const connIcon = document.getElementById('conn-icon');
+    const connTooltip = document.getElementById('conn-tooltip');
+    const connPopup = document.getElementById('conn-popup');
+    let connState = 'disconnected';
+    let connectedHost = null;
+    const terminalOutput = document.getElementById('terminal-output');
+    const terminalForm = document.getElementById('terminal-form');
+    const terminalInput = document.getElementById('terminal-input');
+    const terminalClear = document.getElementById('terminal-clear');
+    const homeBtn = document.getElementById('btn-home');
+
+    const knifeUpBtn = document.getElementById('btn-knife-up');
+    const knifeDownBtn = document.getElementById('btn-knife-down');
+    const bedUpBtn = document.getElementById('btn-bed-up');
+    const bedDownBtn = document.getElementById('btn-bed-down');
+    const rotaryCcwBtn = document.getElementById('btn-rotary-ccw');
+    const rotaryCwBtn = document.getElementById('btn-rotary-cw');
+
+    const inputKnifeFeedrate = document.getElementById('feedrate-knife');
+    const inputKnifeDistance = document.getElementById('distance-knife');
+    const inputBedFeedrate = document.getElementById('feedrate-bed');
+    const inputBedDistance = document.getElementById('distance-bed');
+    const inputRotaryFeedrate = document.getElementById('feedrate-rotary');
+    const inputRotaryDistance = document.getElementById('distance-rotary');
+
+    const posEl = (id) => ({ m: document.getElementById(`${id}-m`), w: document.getElementById(`${id}-w`) });
+    const posKnifeZ = posEl('pos-knife-z');
+    const posBedY = posEl('pos-bed-y');
+    const posRotaryA = posEl('pos-rotary-a');
+
+    const inputHotwirePwm = document.getElementById('hotwire-pwm');
+    const btnHotwireToggle = document.getElementById('hotwire-toggle');
+    let isHotwireOn = false;
+
+    try {
+      hostInput.value = localStorage.getItem('fluidnc-host') || DEFAULT_HOST;
+    } catch (e) { }
+
+    function getHost() {
+      return hostInput.value.trim() || DEFAULT_HOST;
+    }
+
+    // --- DIFFERENTIAL KINEMATICS ---
+    // Y and A motors drive a differential: moving Y and A together by equal
+    // amounts translates the platform without rotating it; moving A alone rotates
+    // it. So bed position = Y, platform rotation = A - Y (work coordinates).
+    // Assumes y and a share the same steps_per_mm in config.yaml.
+    // Rotation is shown in degrees: 1° of platform rotation = MM_PER_DEG of A travel.
+    const MM_PER_DEG = (11 * Math.PI / 360) * (108 / 20);
+    const workPos = { X: 0, Y: 0, Z: 0, A: 0 };
+    const machinePos = { X: 0, Y: 0, Z: 0, A: 0 };
+    let wco = [0, 0, 0, 0];
+    let machineState = '';
+    let statusWaiters = [];
+
+    // --- SOFT LIMITS ---
+    // FluidNC clamps each axis of a jog to its soft limits independently, so a
+    // synced Y+A bed jog that runs into Y's limit would keep moving A and rotate
+    // the platform. Read the limits on connect ($/axes/<axis>) and cap bed jogs
+    // to the travel both axes have left.
+    const axisLimits = {};  // axis -> { min, max } in machine coords
+    let axisCapture = null;  // { axis, cfg } while a $/axes/<axis> dump is streaming
+    const LIMIT_MARGIN = 0.01;
+
+    // Mirrors limitsMinPosition/limitsMaxPosition in FluidNC's Limit.cpp (minus the 1-step slop)
+    function computeLimits(cfg) {
+      if (cfg.soft_limits !== 'true') return { min: -Infinity, max: Infinity };
+      const travel = parseFloat(cfg.max_travel_mm);
+      const homed = 'homing' in cfg;
+      const mpos = homed ? (parseFloat(cfg.mpos_mm) || 0) : 0;
+      if (!homed || cfg.positive_direction === 'true') return { min: mpos - travel, max: mpos };
+      return { min: mpos, max: mpos + travel };
+    }
+
+    // Consumes lines of a "$/axes/y" response; returns true if the line was part of it
+    function parseAxisConfigLine(text) {
+      const head = text.match(/^\/axes\/([a-z]):$/i);
+      if (head) {
+        axisCapture = { axis: head[1].toUpperCase(), cfg: {} };
+        return true;
+      }
+      if (!axisCapture) return false;
+      if (text.startsWith('ok') || text.startsWith('error')) {
+        const { axis, cfg } = axisCapture;
+        axisCapture = null;
+        axisLimits[axis] = computeLimits(cfg);
+        setHomingAvailable(axis, 'homing' in cfg);
+        logTerminal(`${axis} soft limits: [${axisLimits[axis].min}, ${axisLimits[axis].max}]`, 'system');
+        return false;
+      }
+      const kv = text.match(/^(\w+):\s*(.*)$/);
+      if (kv) axisCapture.cfg[kv[1]] = kv[2];  // section headers like "homing:" store ''
+      return !text.startsWith('[');
+    }
+
+    function loadAxisLimits() {
+      for (const axis of ['y', 'a', 'z']) sendGcode(`$/axes/${axis}`, true);
+    }
+
+    // Travel left in `direction` before either Y or A reaches a soft limit
+    function bedTravelRemaining(direction) {
+      let room = Infinity;
+      for (const axis of ['Y', 'A']) {
+        const lim = axisLimits[axis];
+        if (!lim) {
+          logTerminal(`Warning: ${axis} soft limits unknown; bed jog not capped.`, 'error');
+          continue;
+        }
+        room = Math.min(room, direction > 0 ? lim.max - machinePos[axis] : machinePos[axis] - lim.min);
+      }
+      return Math.max(0, room - LIMIT_MARGIN);
+    }
+
+    function nextStatus(timeoutMs = 500) {
+      return new Promise((resolve) => {
+        const timer = setTimeout(resolve, timeoutMs);
+        statusWaiters.push(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+        sendRealtime(RT_STATUS);
+      });
+    }
+
+    // Positions are only trustworthy for planning once a previous jog has decelerated
+    async function waitForNotJogging(timeoutMs = 3000) {
+      const deadline = performance.now() + timeoutMs;
+      do {
+        await nextStatus();
+      } while (machineState.startsWith('Jog') && performance.now() < deadline);
+    }
+
+    // Zero work coordinates. Bed and rotation are coupled (rotation = A - Y), so
+    // zeroing the bed shifts A by the same amount to keep the rotation reading.
+    const ZERO_COMMANDS = {
+      knife: () => 'G10 L20 P0 Z0',
+      bed: () => `G10 L20 P0 Y0 A${(workPos.A - workPos.Y).toFixed(3)}`,
+      rotary: () => `G10 L20 P0 A${workPos.Y.toFixed(3)}`,
+    };
+
+    document.querySelectorAll('[data-zero]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await sendGcode(ZERO_COMMANDS[btn.dataset.zero]());
+        sendRealtime(RT_STATUS);
+      });
+    });
+
+    // Per-axis homing; enabled once $/axes/<axis> shows a homing section
+    document.querySelectorAll('[data-home]').forEach((btn) => {
+      btn.addEventListener('click', () => sendGcode(`$H${btn.dataset.home}`));
+    });
+
+    function setHomingAvailable(axis, available) {
+      const btn = document.querySelector(`[data-home="${axis}"]`);
+      if (!btn) return;
+      btn.disabled = !available;
+      btn.title = available ? `Home ${axis} ($H${axis})` : `No homing configured for ${axis}`;
+    }
+
+    async function updateHotwireState() {
+      let pwmVal = parseFloat(inputHotwirePwm.value);
+      if (isNaN(pwmVal)) pwmVal = 0;
+      pwmVal = Math.min(100, Math.max(0, pwmVal));
+
+      if (isHotwireOn) {
+        await sendGcode(`SET_PIN PIN=hotwire VALUE=${pwmVal}`);
+      } else {
+        await sendGcode('SET_PIN PIN=hotwire VALUE=0');
+      }
+    }
+
+    btnHotwireToggle.addEventListener('click', async () => {
+      isHotwireOn = !isHotwireOn;
+      if (isHotwireOn) {
+        btnHotwireToggle.textContent = 'ON';
+        btnHotwireToggle.classList.add('active');
+      } else {
+        btnHotwireToggle.textContent = 'OFF';
+        btnHotwireToggle.classList.remove('active');
+      }
+      await updateHotwireState();
+    });
+
+    inputHotwirePwm.addEventListener('change', async () => {
+      if (isHotwireOn) {
+        await updateHotwireState();
+      }
+    });
+
+    function updateStatus(state, message) {
+      connState = state;
+      statusDot.className = 'dot ' + state;
+      setStatusMessage(message);
+      updateConnectButton();
+      hostInput.disabled = state === 'connecting';
+    }
+
+    function setStatusMessage(message) {
+      statusText.textContent = message;
+      connTooltip.textContent = message;
+      const alarm = connState === 'connected' && machineState.startsWith('Alarm');
+      connIcon.className = `conn-icon ${connState}${alarm ? ' alarm' : ''}`;
+      document.getElementById('btn-unlock').classList.toggle('attention', alarm);
+    }
+
+    // Connected + same host => Disconnect; connected + edited host => Reconnect
+    function updateConnectButton() {
+      const connected = connState === 'connected';
+      const changed = connected && getHost() !== connectedHost;
+      connectBtn.textContent = !connected ? 'Connect' : changed ? 'Reconnect' : 'Disconnect';
+      connectBtn.classList.toggle('connected', connected && !changed);
+    }
+
+    function openConnPopup(open) {
+      connPopup.hidden = !open;
+      connIcon.setAttribute('aria-expanded', String(open));
+      connWrap.toggleAttribute('data-open', open);
+      if (open) hostInput.focus();
+    }
+
+    // Parse a FluidNC status report, e.g. <Idle|MPos:0.000,1.000,2.000,3.000|FS:0,0|WCO:0,0,0,0>
+    // Axes are reported in X,Y,Z,A order up to the highest configured axis.
+    function parseStatusReport(text) {
+      const m = text.match(/^<(.*)>$/);
+      if (!m) return false;
+      const fields = m[1].split('|');
+      machineState = fields[0];
+      let mpos = null, wpos = null;
+      for (const f of fields.slice(1)) {
+        const [key, val] = f.split(':');
+        const nums = (val || '').split(',').map(parseFloat);
+        if (key === 'MPos') mpos = nums;
+        else if (key === 'WPos') wpos = nums;
+        else if (key === 'WCO') wco = nums;
+      }
+      const pos = wpos || (mpos && mpos.map((v, i) => v - (wco[i] || 0)));
+      const mach = mpos || (wpos && wpos.map((v, i) => v + (wco[i] || 0)));
+      if (mach) {
+        ['X', 'Y', 'Z', 'A'].forEach((axis, i) => {
+          if (i < mach.length && !isNaN(mach[i])) machinePos[axis] = mach[i];
+        });
+      }
+      if (pos) {
+        ['X', 'Y', 'Z', 'A'].forEach((axis, i) => {
+          if (i < pos.length && !isNaN(pos[i])) workPos[axis] = pos[i];
+        });
+      }
+      const rotation = (p) => `${((p.A - p.Y) / MM_PER_DEG).toFixed(1)}°`;
+      for (const [el, p] of [['m', machinePos], ['w', workPos]]) {
+        posKnifeZ[el].textContent = `${p.Z.toFixed(2)}mm`;
+        posBedY[el].textContent = `${p.Y.toFixed(2)}mm`;
+        posRotaryA[el].textContent = rotation(p);
+      }
+      if (ws) setStatusMessage(`Connected to ${connectedHost} · ${machineState}`);
+      const waiters = statusWaiters;
+      statusWaiters = [];
+      waiters.forEach((fn) => fn());
+      return true;
+    }
+
+    function logTerminal(text, type = '') {
+      if (type === '') {
+        if (text.startsWith('ok') || text.startsWith('error')) {
+          pendingOks = Math.max(0, pendingOks - 1);
+        }
+        if (parseStatusReport(text)) return; // don't flood the log with ? responses
+        if (parseAxisConfigLine(text)) return;
+      }
+
+      const line = document.createElement('div');
+      line.className = 'terminal-line ' + type;
+      line.textContent = text;
+      terminalOutput.appendChild(line);
+      terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    function isConnected() {
+      return ws && ws.readyState === WebSocket.OPEN;
+    }
+
+    async function connectController() {
+      if (isConnected()) return true;
+      if (isConnecting) return false;
+
+      const host = getHost();
+      try {
+        localStorage.setItem('fluidnc-host', host);
+      } catch (e) { }
+
+      isConnecting = true;
+      updateStatus('connecting', `Connecting to ${host}...`);
+      logTerminal(`Connecting to ws://${host}/ ...`, 'system');
+
+      return new Promise((resolve) => {
+        let socket;
+        try {
+          socket = new WebSocket(`ws://${host}/`);
+          socket.binaryType = 'arraybuffer';
+        } catch (err) {
+          isConnecting = false;
+          updateStatus('disconnected', 'Connection error');
+          logTerminal('Connection error: ' + err.message, 'error');
+          resolve(false);
+          return;
+        }
+
+        let opened = false;
+        const timeout = setTimeout(() => {
+          if (socket.readyState !== WebSocket.OPEN) socket.close();
+        }, 2500);
+
+        socket.onopen = () => {
+          opened = true;
+          clearTimeout(timeout);
+          ws = socket;
+          connectedHost = host;
+          isConnecting = false;
+          pendingOks = 0;
+          rxBuffer = '';
+          rxDecoder = new TextDecoder();
+          updateStatus('connected', `Connected to ${host}`);
+          logTerminal(`Connected to ${host}.`, 'system');
+          loadAxisLimits();
+          resolve(true);
+        };
+
+        socket.onmessage = (event) => {
+          if (!(event.data instanceof ArrayBuffer)) {
+            // Control message; only surface the ones meant for humans
+            const msg = event.data.trim();
+            if (/^(NOTIFICATION|ERROR):/i.test(msg)) logTerminal(msg, 'system');
+            return;
+          }
+          rxBuffer += rxDecoder.decode(event.data, { stream: true });
+          const lines = rxBuffer.split('\n');
+          rxBuffer = lines.pop();
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed) logTerminal(trimmed);
+          }
+        };
+
+        socket.onclose = (event) => {
+          clearTimeout(timeout);
+          if (ws === socket) {
+            ws = null;
+            pendingOks = 0;
+            stopJog();
+            updateStatus('disconnected', 'Disconnected');
+            logTerminal('Connection closed' + (event.reason ? `: ${event.reason}` : '.'), 'system');
+          } else if (!opened) {
+            // Only a socket that never opened ends the pending attempt; a socket
+            // closed by Reconnect must not clobber the new connection's state.
+            isConnecting = false;
+            updateStatus('disconnected', 'Disconnected');
+            logTerminal(`Could not connect to ws://${host}/ (is the controller on the network?)`, 'error');
+            resolve(false);
+          }
+        };
+      });
+    }
+
+    function disconnectAll() {
+      stopJog();
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+      updateStatus('disconnected', 'Disconnected');
+      logTerminal('Disconnected.', 'system');
+    }
+
+    async function sendGcode(gcode, silent = false) {
+      const trimmed = gcode.trim();
+      if (!trimmed) return;
+
+      if (!isConnected()) {
+        const ok = await connectController();
+        if (!ok) return;
+      }
+
+      try {
+        pendingOks++;
+        ws.send(trimmed + '\n');
+        if (!silent) logTerminal('> ' + trimmed, 'sent');
+      } catch (err) {
+        console.error('Send error:', err);
+        logTerminal('Failed to send: ' + err.message, 'error');
+      }
+    }
+
+    // Realtime commands bypass the line queue and get no "ok". Text frames are
+    // UTF-8, which FluidNC decodes, so bytes >= 0x80 (e.g. jog cancel) arrive intact.
+    function sendRealtime(ch) {
+      if (isConnected()) ws.send(ch);
+    }
+
+    // --- STATUS POLLING ---
+    let statusTimer = null;
+    let isPollingEnabled = true;
+    const togglePoll = document.getElementById('toggle-poll');
+
+    function startStatusPolling() {
+      if (!isPollingEnabled || statusTimer) return;
+      statusTimer = setInterval(() => {
+        if (isPollingEnabled) sendRealtime(RT_STATUS);
+      }, 250);
+    }
+
+    function stopStatusPolling() {
+      if (statusTimer) {
+        clearInterval(statusTimer);
+        statusTimer = null;
+      }
+    }
+
+    if (togglePoll) {
+      togglePoll.addEventListener('change', () => {
+        isPollingEnabled = togglePoll.checked;
+        if (isPollingEnabled) {
+          startStatusPolling();
+          logTerminal('Status polling enabled.', 'system');
+        } else {
+          stopStatusPolling();
+          logTerminal('Status polling disabled.', 'system');
+        }
+      });
+    }
+
+    // --- PRESS & HOLD JOGGING LOGIC ---
+    // Tap: one $J step of the configured distance.
+    // Hold: after HOLD_MS a long $J is queued behind the step; release sends jog-cancel.
+    const JOG_AXES = {
+      knife: { feed: inputKnifeFeedrate, dist: inputKnifeDistance },
+      bed: { feed: inputBedFeedrate, dist: inputBedDistance },
+      rotary: { feed: inputRotaryFeedrate, dist: inputRotaryDistance },
+    };
+    const MAX_FEED = 6500;
+
+    // delta in mm, feed in mm/min (rotary values are converted from degrees before this)
+    function jogCommand(kind, delta, feed) {
+      const d = delta.toFixed(3);
+      switch (kind) {
+        case 'knife':
+          return `$J=G91 Z${d} F${feed.toFixed(0)}`;
+        case 'bed':
+          // Y and A move together so the platform translates without rotating.
+          // F is the vector feed over both axes; scale by sqrt(2) so each axis runs at `feed`.
+          return `$J=G91 Y${d} A${d} F${(feed * Math.SQRT2).toFixed(0)}`;
+        case 'rotary':
+          return `$J=G91 A${d} F${feed.toFixed(0)}`;
+      }
+    }
+
+    // Speed input for `kind` in mm/min, clamped to the axis max rate
+    function jogFeed(kind) {
+      let feed = parseFloat(JOG_AXES[kind].feed.value);
+      if (kind === 'rotary') feed *= 60 * MM_PER_DEG;  // °/s -> mm/min
+      if (isNaN(feed) || feed <= 0) feed = MAX_FEED;
+      return Math.min(feed, MAX_FEED);
+    }
+
+    async function startJog(btn, kind, direction) {
+      stopJog();
+
+      activeBtn = btn;
+      activeBtn.classList.add('active-press');
+
+      if (!isConnected()) {
+        const connected = await connectController();
+        if (!connected || activeBtn !== btn) {
+          stopJog();
+          return;
+        }
+      }
+
+      const feed = jogFeed(kind);
+      let stepDist = parseFloat(JOG_AXES[kind].dist.value);
+      if (kind === 'rotary') stepDist *= MM_PER_DEG;  // ° -> mm
+      if (isNaN(stepDist) || stepDist <= 0) stepDist = 1;
+
+      let holdDist = CONTINUOUS_JOG;
+      if (kind === 'bed') {
+        await waitForNotJogging();
+        if (activeBtn !== btn) return;
+        const room = bedTravelRemaining(direction);
+        if (room <= 0) {
+          logTerminal('Bed is at its soft limit.', 'system');
+          stopJog();
+          return;
+        }
+        stepDist = Math.min(stepDist, room);
+        holdDist = room - stepDist;  // the hold jog is relative to the end of the step
+      }
+
+      await sendGcode(jogCommand(kind, direction * stepDist, feed));
+
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        if (activeBtn !== btn || holdDist <= 0) return;
+        isHoldJogging = true;
+        sendGcode(jogCommand(kind, direction * holdDist, feed));
+      }, HOLD_MS);
+    }
+
+    function stopJog() {
+      if (holdTimer) {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      if (activeBtn) {
+        activeBtn.classList.remove('active-press');
+        activeBtn = null;
+      }
+      if (isHoldJogging) {
+        isHoldJogging = false;
+        sendRealtime(RT_JOG_CANCEL);
+      }
+    }
+
+    function attachJogEvents(btn, kind, direction) {
+      const startHandler = (e) => {
+        e.preventDefault();
+        startJog(btn, kind, direction);
+      };
+
+      const stopHandler = (e) => {
+        e.preventDefault();
+        if (activeBtn === btn) stopJog();
+      };
+
+      btn.addEventListener('mousedown', startHandler);
+      btn.addEventListener('touchstart', startHandler);
+
+      btn.addEventListener('mouseup', stopHandler);
+      btn.addEventListener('mouseleave', stopHandler);
+      btn.addEventListener('touchend', stopHandler);
+      btn.addEventListener('touchcancel', stopHandler);
+    }
+
+    // Knife: Z axis (Up: +1, Down: -1)
+    attachJogEvents(knifeUpBtn, 'knife', 1);
+    attachJogEvents(knifeDownBtn, 'knife', -1);
+
+    // Bed: Y+A together (Up: +1, Down: -1)
+    attachJogEvents(bedUpBtn, 'bed', 1);
+    attachJogEvents(bedDownBtn, 'bed', -1);
+
+    // Rotary: A only (CCW: +1, CW: -1)
+    attachJogEvents(rotaryCcwBtn, 'rotary', 1);
+    attachJogEvents(rotaryCwBtn, 'rotary', -1);
+
+    // Other Event Listeners
+    async function onConnectAction() {
+      if (isConnected()) {
+        const reconnect = getHost() !== connectedHost;
+        disconnectAll();
+        if (!reconnect) return;
+      }
+      if (await connectController()) openConnPopup(false);
+    }
+
+    connectBtn.addEventListener('click', onConnectAction);
+
+    hostInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') onConnectAction();
+    });
+
+    hostInput.addEventListener('input', updateConnectButton);
+
+    connIcon.addEventListener('click', () => openConnPopup(connPopup.hidden));
+
+    document.addEventListener('click', (e) => {
+      if (!connPopup.hidden && !connWrap.contains(e.target)) openConnPopup(false);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !connPopup.hidden) {
+        openConnPopup(false);
+        connIcon.focus();
+      }
+    });
+
+    homeBtn.addEventListener('click', async () => {
+      homeBtn.classList.add('active-press');
+      setTimeout(() => homeBtn.classList.remove('active-press'), 200);
+      await sendGcode('$H');
+    });
+
+    terminalForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const cmd = terminalInput.value;
+      if (cmd) {
+        sendGcode(cmd);
+        terminalInput.value = '';
+      }
+    });
+
+    terminalClear.addEventListener('click', () => {
+      terminalOutput.innerHTML = '';
+    });
+
+    // --- MOVE TO POSITION ---
+    // Clicking a readout opens a popover to move that axis to an absolute position
+    // in machine (G53) or work coordinates, using $J so it can't disturb modal state.
+    const movePopup = document.getElementById('move-popup');
+    const moveTitle = document.getElementById('move-title');
+    const moveInput = document.getElementById('move-input');
+    const moveUnit = document.getElementById('move-unit');
+    const moveGo = document.getElementById('move-go');
+    const moveCancel = document.getElementById('move-cancel');
+    const MOVE_LABELS = { knife: 'knife (Z)', bed: 'bed (Y)', rotary: 'rotary (A)' };
+    let moveTarget = null;  // { kind, coord: 'm' | 'w' }
+
+    function readout(kind, p) {
+      if (kind === 'knife') return p.Z;
+      if (kind === 'bed') return p.Y;
+      return (p.A - p.Y) / MM_PER_DEG;
+    }
+
+    function openMovePopup(badge, kind, coord) {
+      moveTarget = { kind, coord };
+      moveTitle.textContent = `Move ${MOVE_LABELS[kind]} to ${coord === 'm' ? 'machine' : 'work'} position`;
+      moveUnit.textContent = kind === 'rotary' ? '°' : 'mm';
+      moveInput.value = readout(kind, coord === 'm' ? machinePos : workPos).toFixed(kind === 'rotary' ? 1 : 2);
+      movePopup.hidden = false;
+      const rect = badge.getBoundingClientRect();
+      const left = rect.right + window.scrollX - movePopup.offsetWidth;
+      movePopup.style.left = `${Math.max(8, left)}px`;
+      movePopup.style.top = `${rect.bottom + window.scrollY + 6}px`;
+      moveInput.focus();
+      moveInput.select();
+    }
+
+    function closeMovePopup() {
+      movePopup.hidden = true;
+      moveTarget = null;
+    }
+
+    async function moveTo(kind, coord, value) {
+      if (!isConnected() && !(await connectController())) return;
+      await waitForNotJogging();
+
+      const pos = coord === 'm' ? machinePos : workPos;
+      let feed = jogFeed(kind);
+      let targets;  // axis -> target, in the chosen coordinate system
+      if (kind === 'knife') {
+        targets = { Z: value };
+      } else if (kind === 'bed') {
+        // Move Y and A by the same delta so the platform doesn't rotate
+        const delta = value - pos.Y;
+        targets = { Y: value, A: pos.A + delta };
+        feed *= Math.SQRT2;
+      } else {
+        targets = { A: pos.Y + value * MM_PER_DEG };
+      }
+
+      // Refuse rather than let FluidNC clamp an axis (which would break the Y/A sync)
+      for (const [axis, t] of Object.entries(targets)) {
+        const lim = axisLimits[axis];
+        const machineTarget = t + (machinePos[axis] - pos[axis]);
+        if (lim && (machineTarget < lim.min || machineTarget > lim.max)) {
+          logTerminal(`Move rejected: ${axis} would reach ${machineTarget.toFixed(3)} (machine), outside soft limits [${lim.min}, ${lim.max}].`, 'error');
+          return;
+        }
+      }
+
+      const words = Object.entries(targets).map(([axis, t]) => `${axis}${t.toFixed(3)}`).join(' ');
+      await sendGcode(`$J=${coord === 'm' ? 'G53 ' : ''}G90 ${words} F${feed.toFixed(0)}`);
+    }
+
+    function submitMove() {
+      if (!moveTarget) return;
+      const value = parseFloat(moveInput.value);
+      if (isNaN(value)) {
+        moveInput.focus();
+        return;
+      }
+      const { kind, coord } = moveTarget;
+      closeMovePopup();
+      moveTo(kind, coord, value);
+    }
+
+    for (const [kind, els] of [['knife', posKnifeZ], ['bed', posBedY], ['rotary', posRotaryA]]) {
+      for (const coord of ['m', 'w']) {
+        els[coord].addEventListener('click', (e) => {
+          e.stopPropagation();
+          openMovePopup(els[coord], kind, coord);
+        });
+      }
+    }
+
+    moveGo.addEventListener('click', submitMove);
+    moveCancel.addEventListener('click', closeMovePopup);
+    moveInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitMove();
+      else if (e.key === 'Escape') closeMovePopup();
+    });
+    document.addEventListener('click', (e) => {
+      if (!movePopup.hidden && !movePopup.contains(e.target)) closeMovePopup();
+    });
+
+    // --- TABS LOGIC ---
+    const tabBtnControl = document.getElementById('tab-btn-control');
+    const tabBtnGcode = document.getElementById('tab-btn-gcode');
+    const tabControl = document.getElementById('tab-control');
+    const tabGcode = document.getElementById('tab-gcode');
+
+    function switchTab(tab) {
+      const isControl = tab === 'control';
+      tabBtnControl.setAttribute('aria-selected', String(isControl));
+      tabBtnGcode.setAttribute('aria-selected', String(!isControl));
+      tabControl.classList.toggle('active', isControl);
+      tabGcode.classList.toggle('active', !isControl);
+    }
+
+    tabBtnControl.addEventListener('click', () => switchTab('control'));
+    tabBtnGcode.addEventListener('click', () => switchTab('gcode'));
+
+    // --- G-CODE SENDER LOGIC ---
+    const gcodeFileInput = document.getElementById('gcode-file-input');
+    const gcodeInfo = document.getElementById('gcode-info');
+    const runGcodeBtn = document.getElementById('run-gcode-btn');
+    const stopGcodeBtn = document.getElementById('stop-gcode-btn');
+    const gcodeProgressFill = document.getElementById('gcode-progress-fill');
+    const gcodeStatusText = document.getElementById('gcode-status-text');
+    const gcodeHomeCb = document.getElementById('gcode-home-cb');
+
+    let gcodeLines = [];
+    let isRunningGcode = false;
+    let stopRequested = false;
+
+    const gcodeDropZone = document.getElementById('gcode-drop-zone');
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function loadGcodeFile(file) {
+      if (!file) {
+        gcodeLines = [];
+        gcodeInfo.innerHTML = 'No file loaded.';
+        runGcodeBtn.disabled = true;
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        gcodeLines = ev.target.result
+          .split('\n')
+          .map((line) => line.split(';')[0].trim())
+          .filter(Boolean);
+
+        gcodeInfo.innerHTML = `
+          <strong>File:</strong> ${escapeHtml(file.name)} <br>
+          <strong>Size:</strong> ${(file.size / 1024).toFixed(2)} KB <br>
+          <strong>Commands:</strong> ${gcodeLines.length}
+        `;
+
+        runGcodeBtn.disabled = gcodeLines.length === 0 || isRunningGcode;
+        if (gcodeLines.length === 0) {
+          gcodeInfo.innerHTML += '<br><span style="color: var(--danger-color);">No valid G-code commands found.</span>';
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    gcodeFileInput.addEventListener('change', (e) => loadGcodeFile(e.target.files[0]));
+
+    // dragenter/dragleave also fire for child elements, so count depth to know when we've left
+    let dragDepth = 0;
+    gcodeDropZone.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragDepth++;
+      gcodeDropZone.classList.add('dragover');
+    });
+    gcodeDropZone.addEventListener('dragleave', () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) gcodeDropZone.classList.remove('dragover');
+    });
+    gcodeDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = isRunningGcode ? 'none' : 'copy';
+    });
+    gcodeDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragDepth = 0;
+      gcodeDropZone.classList.remove('dragover');
+      if (isRunningGcode) return;
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        gcodeFileInput.value = '';  // keep the input from showing a stale selection
+        loadGcodeFile(file);
+      }
+    });
+
+    // A drop that misses the zone would otherwise navigate the browser to the file
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!gcodeDropZone.contains(e.target)) e.dataTransfer.dropEffect = 'none';
+    });
+    window.addEventListener('drop', (e) => e.preventDefault());
+
+    runGcodeBtn.addEventListener('click', async () => {
+      if (gcodeLines.length === 0 || isRunningGcode) return;
+      
+      if (!isConnected()) {
+        const ok = await connectController();
+        if (!ok) return;
+      }
+
+      isRunningGcode = true;
+      stopRequested = false;
+      runGcodeBtn.disabled = true;
+      stopGcodeBtn.disabled = false;
+      stopGcodeBtn.style.background = 'var(--danger-color)';
+      stopGcodeBtn.style.color = '#fff';
+
+      const linesToSend = [...gcodeLines];
+      if (gcodeHomeCb.checked) {
+        linesToSend.unshift('$H');
+      }
+
+      const total = linesToSend.length;
+      let sent = 0;
+      const startTime = performance.now();
+
+      gcodeProgressFill.style.width = '0%';
+      gcodeStatusText.textContent = `Starting...`;
+      
+      // Stop polling to reduce serial noise
+      const wasPolling = isPollingEnabled;
+      if (wasPolling && togglePoll) {
+         togglePoll.checked = false;
+         togglePoll.dispatchEvent(new Event('change'));
+      }
+
+      logTerminal(`--- Starting G-code file (${total} commands) ---`, 'system');
+
+      // Send a newline to clear buffer
+      await sendGcode('', true);
+
+      for (let i = 0; i < total; i++) {
+        if (stopRequested) {
+          logTerminal('--- G-code run aborted by user ---', 'error');
+          break;
+        }
+
+        // Wait if too many unacknowledged commands
+        while (pendingOks >= 2) {
+          await new Promise(r => setTimeout(r, 10));
+        }
+
+        const cmd = linesToSend[i];
+        if (cmd) {
+          await sendGcode(cmd, true); // silent send
+        }
+        sent++;
+
+        if (i % 5 === 0 || i === total - 1) {
+          const percent = ((sent / total) * 100).toFixed(1);
+          const elapsed = ((performance.now() - startTime) / 1000);
+          gcodeProgressFill.style.width = percent + '%';
+          gcodeStatusText.textContent = `Sent ${sent}/${total} (${percent}%) | Elapsed: ${elapsed.toFixed(1)}s`;
+        }
+      }
+
+      isRunningGcode = false;
+      runGcodeBtn.disabled = false;
+      stopGcodeBtn.disabled = true;
+      stopGcodeBtn.textContent = 'Stop';
+      stopGcodeBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+      stopGcodeBtn.style.color = 'var(--danger-color)';
+
+      if (!stopRequested) {
+        gcodeStatusText.textContent = `Finished in ${((performance.now() - startTime) / 1000).toFixed(1)}s`;
+        logTerminal('--- G-code run completed ---', 'system');
+      }
+      
+      // Restore polling
+      if (wasPolling && togglePoll) {
+         togglePoll.checked = true;
+         togglePoll.dispatchEvent(new Event('change'));
+      }
+    });
+
+    // --- STOP ---
+    // Cancel any jog and feed-hold everything else, then once the hold has finished
+    // decelerating (Hold:0), soft-reset to discard queued motion. Resetting while still
+    // moving would stop the steppers abruptly and raise an Abort Cycle alarm.
+    let isStopping = false;
+
+    async function stopMotion() {
+      stopJog();
+      if (isRunningGcode) {
+        stopRequested = true;
+        stopGcodeBtn.textContent = 'Stopping...';
+        stopGcodeBtn.disabled = true;
+      }
+      if (!isConnected() || isStopping) return;
+      isStopping = true;
+      sendRealtime(RT_JOG_CANCEL);
+      sendRealtime(RT_FEED_HOLD);
+      logTerminal('Stop requested...', 'system');
+
+      const deadline = performance.now() + 5000;
+      do {
+        await nextStatus();
+      } while (/^(Hold:1|Jog|Run)/.test(machineState) && performance.now() < deadline);
+
+      if (machineState.startsWith('Hold')) {
+        sendRealtime(RT_RESET);
+        pendingOks = 0;  // commands still queued will never be acknowledged
+        logTerminal('Stopped; queued motion discarded.', 'system');
+      } else {
+        logTerminal(`Stopped (${machineState}).`, 'system');
+      }
+      isStopping = false;
+    }
+
+    document.getElementById('btn-stop').addEventListener('click', stopMotion);
+
+    // --- MACHINE STATE ACTIONS ---
+    document.getElementById('btn-unlock').addEventListener('click', () => sendGcode('$X'));
+
+    // A reset mid-motion would raise Abort Cycle, so route moving machines through stopMotion
+    document.getElementById('btn-reset').addEventListener('click', async () => {
+      if (!isConnected()) return;
+      await nextStatus();
+      if (/^(Run|Jog|Hold:1|Home)/.test(machineState)) {
+        stopMotion();
+        return;
+      }
+      stopJog();
+      if (isRunningGcode) stopRequested = true;
+      sendRealtime(RT_RESET);
+      pendingOks = 0;
+      logTerminal('Soft reset.', 'system');
+    });
+
+    document.getElementById('btn-sleep').addEventListener('click', () => sendGcode('$SLP'));
+    stopGcodeBtn.addEventListener('click', stopMotion);
+
+    // Attempt auto-connecting on load & start status polling
+    window.addEventListener('DOMContentLoaded', () => {
+      connectController();
+      startStatusPolling();
+    });
+  </script>
+</body>
+
+</html>

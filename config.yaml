@@ -25,7 +25,7 @@ axes:
     steps_per_mm: 1481.5878338736
     max_rate_mm_per_min: 6500.000
     acceleration_mm_per_sec2: 80.000
-    max_travel_mm: 385.000
+    max_travel_mm: 262.000
     soft_limits: true
     homing:
       cycle: 1
@@ -38,10 +38,53 @@ axes:
       feed_scaler: 1.100
 
     motor0:
+      limit_neg_pin: gpio.34.high
+      limit_pos_pin: gpio.35:high
+      limit_all_pin: NO_PIN
+      hard_limits: true
+      pulloff_mm: 3.000
+      tmc_2209:
+        uart_num: 1
+        addr: 3
+        cs_pin: i2so.14
+        r_sense_ohms: 0.110
+        run_amps: 1.400
+        homing_amps: 0.800
+        hold_amps: 0.700
+        microsteps: 256
+        stallguard: 0
+        stallguard_debug: false
+        toff_disable: 0
+        toff_stealthchop: 5
+        toff_coolstep: 3
+        run_mode: StealthChop
+        homing_mode: StealthChop
+        use_enable: false
+        step_pin: I2SO.13
+        direction_pin: I2SO.12
+        disable_pin: I2SO.15
+
+  a:
+    steps_per_mm: 1481.5878338736
+    max_rate_mm_per_min: 6500.000
+    acceleration_mm_per_sec2: 80.000
+    max_travel_mm: 1000.000
+    soft_limits: false
+    # homing:
+    #   cycle: 1
+    #   positive_direction: false
+    #   mpos_mm: 0
+    #   feed_mm_per_min: 300.000
+    #   seek_mm_per_min: 2000.000
+    #   settle_ms: 500
+    #   seek_scaler: 1.100
+    #   feed_scaler: 1.100
+
+    motor0:
       limit_neg_pin: NO_PIN
       limit_pos_pin: NO_PIN
       limit_all_pin: NO_PIN
-      hard_limits: true
+      hard_limits: false
       pulloff_mm: 3.000
       tmc_2209:
         uart_num: 1
@@ -64,54 +107,11 @@ axes:
         direction_pin: I2SO.4
         disable_pin: I2SO.7
 
-  a:
-    steps_per_mm: 1481.5878338736
-    max_rate_mm_per_min: 6500.000
-    acceleration_mm_per_sec2: 80.000
-    max_travel_mm: 1000.000
-    soft_limits: false
-    homing:
-      cycle: 1
-      positive_direction: false
-      mpos_mm: 0
-      feed_mm_per_min: 300.000
-      seek_mm_per_min: 2000.000
-      settle_ms: 500
-      seek_scaler: 1.100
-      feed_scaler: 1.100
-
-    motor0:
-      limit_neg_pin: NO_PIN
-      limit_pos_pin: NO_PIN
-      limit_all_pin: NO_PIN
-      hard_limits: false
-      pulloff_mm: 3.000
-      tmc_2209:
-        uart_num: 1
-        addr: 3
-        cs_pin: i2so.14
-        r_sense_ohms: 0.110
-        run_amps: 0.800
-        homing_amps: 1.400
-        hold_amps: 0.700
-        microsteps: 256
-        stallguard: 0
-        stallguard_debug: false
-        toff_disable: 0
-        toff_stealthchop: 5
-        toff_coolstep: 3
-        run_mode: StealthChop
-        homing_mode: StealthChop
-        use_enable: false
-        step_pin: I2SO.13
-        direction_pin: I2SO.12
-        disable_pin: I2SO.15
-
   z:
     steps_per_mm: 1481.5878338736
     max_rate_mm_per_min: 6500.000
     acceleration_mm_per_sec2: 80.000
-    max_travel_mm: 385.000
+    max_travel_mm: 294.000
     soft_limits: true
     homing:
       cycle: 1
@@ -171,7 +171,7 @@ probe:
   check_mode_start: false
 
 start:
-  must_home: false
+  must_home: true
 
 coolant:
   flood_pin: NO_PIN
@@ -189,6 +189,7 @@ control:
   macro3_pin: NO_PIN
 
 macros:
+  after_homing: G92 X0 Y0 Z0
   startup_line0:
   startup_line1:
   macro0:
@@ -204,8 +205,8 @@ user_inputs:
   digital0_pin: gpio.25:high
   digital1_pin: gpio.33:high
   digital2_pin: gpio.32:high
-  digital3_pin: gpio.35:high
-  digital4_pin: gpio.34:high
+  digital3_pin: NO_PIN
+  digital4_pin: NO_PIN
   digital5_pin: NO_PIN
   digital6_pin: NO_PIN
 
