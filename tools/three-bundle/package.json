@@ -1,0 +1,12 @@
+{
+  "name": "three-bundle",
+  "private": true,
+  "description": "Builds web/vendor/three.js: the subset of three.js the simulator uses, minified.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "three": "0.186.0"
+  }
+}

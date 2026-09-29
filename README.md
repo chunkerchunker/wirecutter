@@ -16,6 +16,14 @@
 
 Once installed, and once wifi is configured (also via Chrome installer), access at [WebUI](http://hotwire.local).
 
+## Web control page
+
+`web/` is a static page served from the controller's SD card over FluidNC's WebDAV.
+
+- `just deploy` uploads it (gzipped) to `http://hotwire.local/sd/hotwire/index.html`
+- `just serve` runs it locally at http://127.0.0.1:8000 (ES modules don't load from `file://`)
+- `just vendor` rebuilds `web/vendor/three.js` (three.js subset for the G-code simulator)
+
 ### hotwire control
 
 user_outputs:
