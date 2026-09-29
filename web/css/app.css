@@ -822,6 +822,62 @@ html {
   }
 }
 
+/* G-code panel: drop zone until a file is loaded, then a compact open button */
+.gcode-card {
+  flex-direction: column;
+  gap: 15px;
+}
+
+.gcode-card:not(.loaded) .when-loaded,
+.gcode-card.loaded .drop-zone {
+  display: none;
+}
+
+.gcode-card.loaded.dragover {
+  outline: 2px dashed var(--accent-color);
+  outline-offset: -8px;
+}
+
+.gcode-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.gcode-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.file-open-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.file-open-btn:hover,
+#gcode-file-input:focus-visible + .drop-zone,
+.gcode-card:has(#gcode-file-input:focus-visible) .file-open-btn {
+  background: var(--btn-hover);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.gcode-run {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* G-code file drop zone (also clickable to open the file picker) */
 .drop-zone {
   display: flex;
@@ -839,13 +895,12 @@ html {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.drop-zone:hover,
-.drop-zone:focus-within {
+.drop-zone:hover {
   border-color: rgba(255, 255, 255, 0.35);
   color: var(--text-primary);
 }
 
-.drop-zone.dragover {
+.gcode-card.dragover .drop-zone {
   border-color: var(--accent-color);
   background: rgba(59, 130, 246, 0.12);
   color: var(--text-primary);
@@ -1054,6 +1109,26 @@ html {
   padding: 4px;
 }
 
+.sim-sync {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sim-sync input {
+  margin: 0;
+  accent-color: var(--accent-color);
+}
+
+.sim-controls :disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .sim-stock {
   display: flex;
   align-items: center;
@@ -1093,4 +1168,16 @@ html {
   .sim-view {
     height: 280px;
   }
+}
+
+/* Controls locked while a G-code program is streaming */
+.run-locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.terminal-input:disabled,
+.terminal-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

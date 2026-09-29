@@ -271,20 +271,29 @@
     </div> <!-- end tab-control -->
 
     <div id="tab-gcode" class="tab-content" role="tabpanel">
-      <div class="panel-card" style="flex-direction: column; gap: 15px; width: 100%; box-sizing: border-box;">
-        <div class="settings-column-title" style="margin-bottom: 5px; border: none; font-size: 1.1rem; padding-bottom: 0;">G-code File Sender</div>
-        
-        <label class="drop-zone" id="gcode-drop-zone">
+      <div class="panel-card gcode-card" id="gcode-card">
+        <div class="gcode-header">
+          <span class="gcode-title">G-code File Sender</span>
+          <label for="gcode-file-input" class="file-open-btn when-loaded" id="gcode-open-btn" title="Open another G-code file"
+            aria-label="Open another G-code file">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+          </label>
+        </div>
+        <input type="file" id="gcode-file-input" class="visually-hidden" accept=".gcode,.nc,.txt">
+
+        <label for="gcode-file-input" class="drop-zone" id="gcode-drop-zone">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" />
             <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
           </svg>
           <span>Drop a G-code file here, or <strong>choose a file</strong></span>
-          <input type="file" id="gcode-file-input" class="visually-hidden" accept=".gcode,.nc,.txt">
         </label>
-        
-        <div id="gcode-info" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(0,0,0,0.25); padding: 12px; border-radius: 8px; min-height: 40px; border: 1px solid var(--card-border);">
+
+        <div id="gcode-info" class="when-loaded" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(0,0,0,0.25); padding: 12px; border-radius: 8px; min-height: 40px; border: 1px solid var(--card-border);">
           No file loaded.
         </div>
 
@@ -303,6 +312,10 @@
               <option value="20" selected>20×</option>
               <option value="100">100×</option>
             </select>
+            <label class="sim-sync" title="Follow the lines being sent while a program runs">
+              <input type="checkbox" id="sim-sync" checked>
+              <span>Sync</span>
+            </label>
           </div>
           <div class="sim-stock">
             <span class="sim-stock-label">Stock</span>
@@ -315,20 +328,18 @@
           </div>
         </div>
 
-        <label class="poll-toggle-label" style="margin-top: 5px;">
-          <input type="checkbox" id="gcode-home-cb" checked>
-          <span>Home before running ($H)</span>
-        </label>
+        <div class="gcode-run when-loaded">
 
-        <div style="display: flex; gap: 10px; margin-top: 5px;">
+        <div style="display: flex; gap: 10px;">
           <button id="run-gcode-btn" class="connect-btn" style="flex: 1; padding: 12px;" disabled>Run G-code</button>
           <button id="stop-gcode-btn" class="connect-btn" style="flex: 1; padding: 12px; background: rgba(239, 68, 68, 0.2); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.4);" disabled>Stop</button>
         </div>
 
-        <div style="width: 100%; height: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; overflow: hidden; margin-top: 5px;">
+        <div style="width: 100%; height: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; overflow: hidden;">
           <div id="gcode-progress-fill" style="width: 0%; height: 100%; background: var(--success-color); transition: width 0.2s;"></div>
         </div>
         <div id="gcode-status-text" style="font-size: 0.85rem; text-align: center; color: var(--text-secondary);">Ready</div>
+        </div>
       </div>
     </div>
 

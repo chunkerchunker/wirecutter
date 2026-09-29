@@ -11,6 +11,7 @@ const DEFAULT_HOST = location.protocol.startsWith('http') && location.hostname ?
 const RT_STATUS = '?';
 const RT_JOG_CANCEL = '\x85';
 const RT_FEED_HOLD = '!';
+const RT_CYCLE_START = '~';
 const RT_RESET = '\x18';
 
 let ws = null;
@@ -753,13 +754,14 @@ const runGcodeBtn = document.getElementById('run-gcode-btn');
 const stopGcodeBtn = document.getElementById('stop-gcode-btn');
 const gcodeProgressFill = document.getElementById('gcode-progress-fill');
 const gcodeStatusText = document.getElementById('gcode-status-text');
-const gcodeHomeCb = document.getElementById('gcode-home-cb');
 
 let gcodeLines = [];
+let gcodeLineNumbers = [];  // file line index of each entry in gcodeLines, for simulation sync
 let isRunningGcode = false;
+let isPaused = false;
 let stopRequested = false;
 
-const gcodeDropZone = document.getElementById('gcode-drop-zone');
+const gcodeCard = document.getElementById('gcode-card');
 const simPanel = initSimPanel();
 
 function escapeHtml(text) {
@@ -769,20 +771,16 @@ function escapeHtml(text) {
 }
 
 function loadGcodeFile(file) {
-  if (!file) {
-    gcodeLines = [];
-    gcodeInfo.innerHTML = 'No file loaded.';
-    runGcodeBtn.disabled = true;
-    return;
-  }
-
   const reader = new FileReader();
   reader.onload = (ev) => {
     const fileLines = ev.target.result.split('\n');
     simPanel.load(fileLines);
-    gcodeLines = fileLines
-      .map((line) => line.split(';')[0].trim())
-      .filter(Boolean);
+    const program = fileLines
+      .map((line, i) => ({ text: line.split(';')[0].trim(), line: i }))
+      .filter((l) => l.text);
+    gcodeLines = program.map((l) => l.text);
+    gcodeLineNumbers = program.map((l) => l.line);
+    gcodeCard.classList.add('loaded');
 
     gcodeInfo.innerHTML = `
       <strong>File:</strong> ${escapeHtml(file.name)} <br>
@@ -798,27 +796,32 @@ function loadGcodeFile(file) {
   reader.readAsText(file);
 }
 
-gcodeFileInput.addEventListener('change', (e) => loadGcodeFile(e.target.files[0]));
+// A cancelled picker can report no file; keep the current program in that case
+gcodeFileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) loadGcodeFile(e.target.files[0]);
+});
 
-// dragenter/dragleave also fire for child elements, so count depth to know when we've left
+// The whole G-code panel accepts drops (the drop zone before a file is loaded, the
+// card outline after). dragenter/dragleave also fire for child elements, so count
+// depth to know when the drag has left the panel.
 let dragDepth = 0;
-gcodeDropZone.addEventListener('dragenter', (e) => {
+gcodeCard.addEventListener('dragenter', (e) => {
   e.preventDefault();
   dragDepth++;
-  gcodeDropZone.classList.add('dragover');
+  if (!isRunningGcode) gcodeCard.classList.add('dragover');
 });
-gcodeDropZone.addEventListener('dragleave', () => {
+gcodeCard.addEventListener('dragleave', () => {
   dragDepth = Math.max(0, dragDepth - 1);
-  if (dragDepth === 0) gcodeDropZone.classList.remove('dragover');
+  if (dragDepth === 0) gcodeCard.classList.remove('dragover');
 });
-gcodeDropZone.addEventListener('dragover', (e) => {
+gcodeCard.addEventListener('dragover', (e) => {
   e.preventDefault();
   e.dataTransfer.dropEffect = isRunningGcode ? 'none' : 'copy';
 });
-gcodeDropZone.addEventListener('drop', (e) => {
+gcodeCard.addEventListener('drop', (e) => {
   e.preventDefault();
   dragDepth = 0;
-  gcodeDropZone.classList.remove('dragover');
+  gcodeCard.classList.remove('dragover');
   if (isRunningGcode) return;
   const file = e.dataTransfer.files[0];
   if (file) {
@@ -827,32 +830,52 @@ gcodeDropZone.addEventListener('drop', (e) => {
   }
 });
 
-// A drop that misses the zone would otherwise navigate the browser to the file
+// A drop that misses the panel would otherwise navigate the browser to the file
 window.addEventListener('dragover', (e) => {
   e.preventDefault();
-  if (!gcodeDropZone.contains(e.target)) e.dataTransfer.dropEffect = 'none';
+  if (!gcodeCard.contains(e.target)) e.dataTransfer.dropEffect = 'none';
 });
 window.addEventListener('drop', (e) => e.preventDefault());
 
-runGcodeBtn.addEventListener('click', async () => {
+// The Run button doubles as Pause/Resume while a program is streaming. Pause is a
+// feed hold (motion decelerates and waits) plus holding back further lines; Resume
+// is cycle start.
+function setPaused(paused) {
+  isPaused = paused;
+  sendRealtime(paused ? RT_FEED_HOLD : RT_CYCLE_START);
+  runGcodeBtn.textContent = paused ? 'Resume' : 'Pause';
+  logTerminal(paused ? 'Paused (feed hold).' : 'Resumed.', 'system');
+  if (paused) gcodeStatusText.textContent = 'Paused';
+  simPanel.setRunState(true, paused);
+}
+
+runGcodeBtn.addEventListener('click', () => {
+  if (isRunningGcode) setPaused(!isPaused);
+  else runProgram();
+});
+
+async function runProgram() {
   if (gcodeLines.length === 0 || isRunningGcode) return;
-  
+
   if (!isConnected()) {
     const ok = await connectController();
     if (!ok) return;
   }
 
   isRunningGcode = true;
+  isPaused = false;
   stopRequested = false;
-  runGcodeBtn.disabled = true;
+  runGcodeBtn.textContent = 'Pause';
+  gcodeFileInput.disabled = true;  // the Run button now means Pause; don't swap files mid-run
+  setRunLock(true);
   stopGcodeBtn.disabled = false;
   stopGcodeBtn.style.background = 'var(--danger-color)';
   stopGcodeBtn.style.color = '#fff';
 
   const linesToSend = [...gcodeLines];
-  if (gcodeHomeCb.checked) {
-    linesToSend.unshift('$H');
-  }
+  const fileLineOf = [...gcodeLineNumbers];
+  simPanel.setRunState(true, false);
+  simPanel.follow(-1);
 
   const total = linesToSend.length;
   let sent = 0;
@@ -884,9 +907,20 @@ runGcodeBtn.addEventListener('click', async () => {
       await new Promise(r => setTimeout(r, 10));
     }
 
+    // Hold back further lines while paused, checked right before sending so a line
+    // waiting on backpressure doesn't slip out after the feed hold
+    while (isPaused && !stopRequested) {
+      await new Promise(r => setTimeout(r, 50));
+    }
+    if (stopRequested) {
+      logTerminal('--- G-code run aborted by user ---', 'error');
+      break;
+    }
+
     const cmd = linesToSend[i];
     if (cmd) {
       await sendGcode(cmd, true); // silent send
+      simPanel.follow(fileLineOf[i]);
     }
     sent++;
 
@@ -899,7 +933,11 @@ runGcodeBtn.addEventListener('click', async () => {
   }
 
   isRunningGcode = false;
-  runGcodeBtn.disabled = false;
+  isPaused = false;
+  runGcodeBtn.textContent = 'Run G-code';
+  gcodeFileInput.disabled = false;
+  setRunLock(false);
+  simPanel.setRunState(false, false);
   stopGcodeBtn.disabled = true;
   stopGcodeBtn.textContent = 'Stop';
   stopGcodeBtn.style.background = 'rgba(239, 68, 68, 0.2)';
@@ -915,6 +953,49 @@ runGcodeBtn.addEventListener('click', async () => {
      togglePoll.checked = true;
      togglePoll.dispatchEvent(new Event('change'));
   }
+}
+
+// While a program streams, lock out controls that would inject commands between its
+// lines (jogs, moves, home/zero, unlock, sleep, terminal). Stop, Reset and
+// Pause/Resume stay live.
+const RUN_LOCKED = [
+  '.axis-actions',
+  '.pos-stack',
+  '#tab-control .btn:not(.btn-stop)',
+  '#btn-unlock',
+  '#btn-sleep',
+  '#gcode-open-btn',
+].join(', ');
+const terminalSend = terminalForm.querySelector('.terminal-send');
+
+function setRunLock(locked) {
+  if (locked) {
+    stopJog();
+    closeMovePopup();
+  }
+  for (const el of document.querySelectorAll(RUN_LOCKED)) {
+    el.inert = locked;
+    el.classList.toggle('run-locked', locked);
+  }
+  terminalInput.disabled = locked;
+  terminalSend.disabled = locked;
+  terminalInput.placeholder = locked ? 'Disabled while G-code is running' : 'Send G-code command...';
+}
+
+// Leaving the page mid-run would silently stop streaming partway through the program.
+// Ask first (browsers show their own fixed wording); if the user leaves anyway,
+// feed-hold on the way out so the machine stops cleanly rather than finishing
+// whatever was already queued and halting at an arbitrary point.
+window.addEventListener('beforeunload', (e) => {
+  if (!isRunningGcode) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+window.addEventListener('pagehide', () => {
+  if (!isRunningGcode) return;
+  sendRealtime(RT_JOG_CANCEL);
+  sendRealtime(RT_FEED_HOLD);
 });
 
 // --- STOP ---

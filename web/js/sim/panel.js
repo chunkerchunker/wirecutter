@@ -18,6 +18,7 @@ export function initSimPanel() {
   const stockInputs = { w: $('sim-stock-w'), d: $('sim-stock-d'), h: $('sim-stock-h') };
   const autoBtn = $('sim-stock-auto');
   const status = $('sim-status');
+  const syncCb = $('sim-sync');
 
   const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
   let viewer = null;
@@ -29,6 +30,8 @@ export function initSimPanel() {
   let lastFrame = 0;
   let time = 0;
   let rerunTimer = null;
+  let running = false;
+  let paused = false;
 
   async function ensureViewer() {
     if (viewer) return viewer;
@@ -68,6 +71,28 @@ export function initSimPanel() {
     if (lo >= moves.length) return moves.length;
     const span = cumTime[lo + 1] - cumTime[lo];
     return lo + (span > 0 ? (seconds - cumTime[lo]) / span : 1);
+  }
+
+  // Program time at the end of the last move produced by file lines <= fileLine
+  function lineEndTime(fileLine) {
+    let lo = 0;
+    let hi = moves.length;  // first move with line > fileLine
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (moves[mid].line <= fileLine) lo = mid + 1;
+      else hi = mid;
+    }
+    return cumTime[lo];
+  }
+
+  // While synced to a running (not paused) program, playback is driven by the
+  // sender, so the manual controls are disabled
+  function updateLock() {
+    const locked = syncCb.checked && running && !paused;
+    playBtn.disabled = locked;
+    scrub.disabled = locked;
+    speedSel.disabled = locked;
+    if (locked) setPlaying(false);
   }
 
   function totalTime() {
@@ -148,6 +173,7 @@ export function initSimPanel() {
   });
 
   $('sim-reset-view').addEventListener('click', () => viewer && viewer.fitView());
+  syncCb.addEventListener('change', updateLock);
 
   return {
     /** @param {string[]} programLines lines exactly as they will be sent */
@@ -165,6 +191,19 @@ export function initSimPanel() {
       showTime(0);
       if (parsed.warnings.length) console.warn('G-code simulation:', parsed.warnings);
       runSimulation();
+    },
+
+    /** Called by the sender with the program's running/paused state */
+    setRunState(isRunning, isPaused) {
+      running = isRunning;
+      paused = isPaused;
+      updateLock();
+    },
+
+    /** Called after each line is sent; -1 = program start */
+    follow(fileLine) {
+      if (!syncCb.checked || !moves.length) return;
+      showTime(fileLine < 0 ? 0 : lineEndTime(fileLine));
     },
   };
 }

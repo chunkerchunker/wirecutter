@@ -1,5 +1,5 @@
 host := "hotwire.local"
-dest := "sd/hotwire"
+dest := "sd"
 
 # Upload web/ to the controller's SD card (gzipped; FluidNC's WebDAV serves foo.js.gz for foo.js)
 deploy:
