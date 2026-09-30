@@ -755,6 +755,20 @@ function switchTab(tab) {
 tabBtnControl.addEventListener('click', () => switchTab('control'));
 tabBtnGcode.addEventListener('click', () => switchTab('gcode'));
 
+// Modal confirmation; resolves true if the action button was chosen (Esc/Cancel = false)
+const confirmDialog = document.getElementById('confirm-dialog');
+
+function confirmAction(title, text, actionLabel) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-text').textContent = text;
+  document.getElementById('confirm-ok').textContent = actionLabel;
+  confirmDialog.returnValue = '';
+  confirmDialog.showModal();
+  return new Promise((resolve) => {
+    confirmDialog.addEventListener('close', () => resolve(confirmDialog.returnValue === 'ok'), { once: true });
+  });
+}
+
 // --- G-CODE SENDER LOGIC ---
 const gcodeFileInput = document.getElementById('gcode-file-input');
 const gcodeInfo = document.getElementById('gcode-info');
@@ -805,7 +819,6 @@ function loadGcodeFile(file) {
 }
 
 const gcodeClearBtn = document.getElementById('gcode-clear-btn');
-const gcodeClearDialog = document.getElementById('gcode-clear-dialog');
 
 function clearGcode() {
   if (isRunningGcode) return;
@@ -820,12 +833,10 @@ function clearGcode() {
   gcodeStatusText.textContent = 'Ready';
 }
 
-gcodeClearBtn.addEventListener('click', () => {
-  if (!isRunningGcode) gcodeClearDialog.showModal();
-});
-gcodeClearDialog.addEventListener('close', () => {
-  if (gcodeClearDialog.returnValue === 'clear') clearGcode();
-  gcodeClearDialog.returnValue = '';
+gcodeClearBtn.addEventListener('click', async () => {
+  if (isRunningGcode) return;
+  const ok = await confirmAction('Clear loaded G-code?', 'The program and its simulation will be removed.', 'Clear');
+  if (ok) clearGcode();
 });
 
 // A cancelled picker can report no file; keep the current program in that case
@@ -998,6 +1009,7 @@ const RUN_LOCKED = [
   '#tab-control .btn:not(.btn-stop)',
   '#btn-unlock',
   '#btn-sleep',
+  '#btn-restart',
   '#gcode-open-btn',
 ].join(', ');
 const terminalSend = terminalForm.querySelector('.terminal-send');
@@ -1087,6 +1099,30 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-sleep').addEventListener('click', () => sendGcode('$SLP'));
+
+// $Bye reboots the controller, which is what reloads config.yaml (a soft reset doesn't).
+// The socket drops during the reboot; keep trying to reconnect until it's back.
+document.getElementById('btn-restart').addEventListener('click', async () => {
+  if (!isConnected() || isRunningGcode) return;
+  const ok = await confirmAction(
+    'Restart controller?',
+    'Reboots the board and reloads config.yaml. Motion and the hotwire stop, and axes will need homing again.',
+    'Restart'
+  );
+  if (!ok || !isConnected()) return;
+  const socket = ws;
+  stopJog();
+  logTerminal('Restarting controller...', 'system');
+  await sendGcode('$Bye');
+  await new Promise((resolve) => {
+    socket.addEventListener('close', resolve, { once: true });
+    setTimeout(resolve, 5000);
+  });
+  for (let i = 0; i < 15 && !isConnected(); i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    await connectController();
+  }
+});
 stopGcodeBtn.addEventListener('click', stopMotion);
 
 // Attempt auto-connecting on load & start status polling

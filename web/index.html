@@ -157,6 +157,7 @@
         <button type="button" class="mach-btn" id="btn-unlock" title="Clear alarm lock ($X)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>Unlock</button>
         <button type="button" class="mach-btn" id="btn-reset" title="Soft reset (Ctrl-X)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset</button>
         <button type="button" class="mach-btn" id="btn-sleep" title="Disable motors ($SLP); reset to wake"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>Sleep</button>
+        <button type="button" class="mach-btn" id="btn-restart" title="Restart controller ($Bye); reloads config.yaml"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3v8"/><path d="M6.3 7a8 8 0 1 0 11.4 0"/></svg>Restart</button>
       </div>
     </div>
 
@@ -352,13 +353,13 @@
       </div>
     </div>
 
-    <dialog class="confirm-dialog" id="gcode-clear-dialog" aria-labelledby="gcode-clear-title">
+    <dialog class="confirm-dialog" id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
       <form method="dialog">
-        <div class="move-title" id="gcode-clear-title">Clear loaded G-code?</div>
-        <p class="confirm-text">The program and its simulation will be removed.</p>
+        <div class="move-title" id="confirm-title"></div>
+        <p class="confirm-text" id="confirm-text"></p>
         <div class="move-actions">
           <button type="submit" class="move-cancel" value="cancel" autofocus>Cancel</button>
-          <button type="submit" class="connect-btn confirm-danger" value="clear">Clear</button>
+          <button type="submit" class="connect-btn confirm-danger" id="confirm-ok" value="ok"></button>
         </div>
       </form>
     </dialog>
