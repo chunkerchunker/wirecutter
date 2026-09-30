@@ -224,30 +224,16 @@ user_outputs:
   digital2_pin: NO_PIN
   digital3_pin: NO_PIN
 
-#Pendant:
-# uart2:
-#  txd_pin: gpio.15
-#  rxd_pin: gpio.12
-#  rts_pin: NO_PIN
-#  cts_pin: NO_PIN
-#  baud: 1000000
-#  mode: 8N1
-#
-# uart_channel2:
-# report_interval_ms: 75
-# uart_num: 2
-
-# Hotwire as a laser-mode spindle: S changes apply without stopping motion.
-# M3 S<percent> is on during G1/G2/G3 (and jogs); G0 moves run with it off.
-# S maps 1:1 to duty cycle. Laser requires pwm_hz >= 1000 and has no spinup_ms.
-Laser:
-  pwm_hz: 1000
+# Hotwire: M3 S<percent> on, M5 off; S maps 1:1 to duty cycle
+PWM:
+  pwm_hz: 10
+  direction_pin: NO_PIN
   output_pin: gpio.02
   enable_pin: NO_PIN
   disable_with_s0: false
   s0_with_disable: true
+  spinup_ms: 2000
+  spindown_ms: 0
   tool_num: 0
   speed_map: 0=0.000% 100=100.000%
   off_on_alarm: true
-
-# Inputs left to right gpoi.25/33/32/35/34/39/36

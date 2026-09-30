@@ -26,9 +26,11 @@ Once installed, and once wifi is configured (also via Chrome installer), access 
 
 ### hotwire control
 
-The hotwire is configured as FluidNC's Laser spindle (`Laser:` in `config.yaml`), with `speed_map: 0=0% 100=100%` so `S` is the duty cycle in percent. Laser mode applies `S` changes without stopping motion, so power can vary mid-cut.
-- `G1 M3 S25` — 25% duty cycle (`G1` needed when idle: laser mode holds the output at 0 unless the modal motion is G1/G2/G3)
-- `S40` on a `G1` line — change power mid-cut
+The hotwire is configured as FluidNC's PWM spindle (`PWM:` in `config.yaml`), with `speed_map: 0=0% 100=100%` so `S` is the duty cycle in percent:
+- `M3 S25` — 25% duty cycle (waits `spinup_ms` for the wire to heat)
+- `M3 S100` — fully on
 - `M5` — off (also forced off on alarm via `off_on_alarm: true`)
 
-`G0` moves run with the wire off; the output returns to `S` on the next `G1`/`G2`/`G3` move. Jogs (`$J=`) keep it at `S`. There is no spin-up delay; add a dwell (`G4 P2`) after `M3` to let the wire heat.
+`S` is modal and resets to 0 on boot or soft reset, so always give it on the `M3` line. Spindle changes wait for queued motion to finish, so changing `S` mid-program briefly stops motion.
+
+The Jackpot2's outputs can't do fast PWM (see the [Jackpot2 docs](https://docs.v1e.com/electronics/jackpot2/)), so `pwm_hz` stays low (10). This rules out the `Laser:` spindle type, which requires `pwm_hz` >= 1000.

@@ -188,16 +188,14 @@ function setHomingAvailable(axis, available) {
   btn.title = available ? `Home ${axis} ($H${axis})` : `No homing configured for ${axis}`;
 }
 
-// The hotwire is FluidNC's Laser spindle, with speed_map making S the duty cycle in %.
-// Laser mode holds the output at 0 unless the modal motion is G1/G2/G3, so select G1
-// (no axis words, so nothing moves) to turn it on while idle.
+// The hotwire is FluidNC's PWM spindle, with speed_map making S the duty cycle in %
 async function updateHotwireState() {
   let pwmVal = parseFloat(inputHotwirePwm.value);
   if (isNaN(pwmVal)) pwmVal = 0;
   pwmVal = Math.min(100, Math.max(0, pwmVal));
 
   if (isHotwireOn) {
-    await sendGcode(`G1 M3 S${pwmVal}`);
+    await sendGcode(`M3 S${pwmVal}`);
   } else {
     await sendGcode('M5');
   }
