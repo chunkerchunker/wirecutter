@@ -796,6 +796,30 @@ function loadGcodeFile(file) {
   reader.readAsText(file);
 }
 
+const gcodeClearBtn = document.getElementById('gcode-clear-btn');
+const gcodeClearDialog = document.getElementById('gcode-clear-dialog');
+
+function clearGcode() {
+  if (isRunningGcode) return;
+  gcodeLines = [];
+  gcodeLineNumbers = [];
+  simPanel.clear();
+  gcodeFileInput.value = '';
+  gcodeCard.classList.remove('loaded');
+  gcodeInfo.textContent = 'No file loaded.';
+  runGcodeBtn.disabled = true;
+  gcodeProgressFill.style.width = '0%';
+  gcodeStatusText.textContent = 'Ready';
+}
+
+gcodeClearBtn.addEventListener('click', () => {
+  if (!isRunningGcode) gcodeClearDialog.showModal();
+});
+gcodeClearDialog.addEventListener('close', () => {
+  if (gcodeClearDialog.returnValue === 'clear') clearGcode();
+  gcodeClearDialog.returnValue = '';
+});
+
 // A cancelled picker can report no file; keep the current program in that case
 gcodeFileInput.addEventListener('change', (e) => {
   if (e.target.files[0]) loadGcodeFile(e.target.files[0]);
@@ -867,6 +891,7 @@ async function runProgram() {
   stopRequested = false;
   runGcodeBtn.textContent = 'Pause';
   gcodeFileInput.disabled = true;  // the Run button now means Pause; don't swap files mid-run
+  gcodeClearBtn.disabled = true;
   setRunLock(true);
   stopGcodeBtn.disabled = false;
   stopGcodeBtn.style.background = 'var(--danger-color)';
@@ -936,6 +961,7 @@ async function runProgram() {
   isPaused = false;
   runGcodeBtn.textContent = 'Run G-code';
   gcodeFileInput.disabled = false;
+  gcodeClearBtn.disabled = false;
   setRunLock(false);
   simPanel.setRunState(false, false);
   stopGcodeBtn.disabled = true;

@@ -193,6 +193,20 @@ export function initSimPanel() {
       runSimulation();
     },
 
+    /** Drop the loaded program and hide the panel */
+    clear() {
+      clearTimeout(rerunTimer);
+      simId++;  // ignore any simulation still in flight
+      setPlaying(false);
+      lines = [];
+      moves = [];
+      cumTime = [0];
+      time = 0;
+      overlay.textContent = '';
+      status.textContent = '';
+      panel.hidden = true;
+    },
+
     /** Called by the sender with the program's running/paused state */
     setRunState(isRunning, isPaused) {
       running = isRunning;

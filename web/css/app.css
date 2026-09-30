@@ -845,6 +845,11 @@ html {
   gap: 10px;
 }
 
+.gcode-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .gcode-title {
   font-size: 1.1rem;
   font-weight: 600;
@@ -870,6 +875,46 @@ html {
   background: var(--btn-hover);
   color: var(--text-primary);
   border-color: rgba(255, 255, 255, 0.25);
+}
+
+.file-open-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--btn-bg);
+  color: var(--text-secondary);
+  border-color: var(--card-border);
+}
+
+/* Confirmation dialog (native <dialog>, shown modal) */
+.confirm-dialog {
+  padding: 16px;
+  max-width: min(320px, calc(100vw - 32px));
+  background: #1a1c20;
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+}
+
+.confirm-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.confirm-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirm-text {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.confirm-danger {
+  background: var(--danger-color);
+  color: #fff;
 }
 
 .gcode-run {

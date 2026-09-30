@@ -274,13 +274,22 @@
       <div class="panel-card gcode-card" id="gcode-card">
         <div class="gcode-header">
           <span class="gcode-title">G-code File Sender</span>
-          <label for="gcode-file-input" class="file-open-btn when-loaded" id="gcode-open-btn" title="Open another G-code file"
-            aria-label="Open another G-code file">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            </svg>
-          </label>
+          <div class="gcode-header-actions when-loaded">
+            <label for="gcode-file-input" class="file-open-btn" id="gcode-open-btn" title="Open another G-code file"
+              aria-label="Open another G-code file">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+            </label>
+            <button type="button" class="file-open-btn" id="gcode-clear-btn" title="Clear loaded G-code"
+              aria-label="Clear loaded G-code">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" />
+              </svg>
+            </button>
+          </div>
         </div>
         <input type="file" id="gcode-file-input" class="visually-hidden" accept=".gcode,.nc,.txt">
 
@@ -342,6 +351,17 @@
         </div>
       </div>
     </div>
+
+    <dialog class="confirm-dialog" id="gcode-clear-dialog" aria-labelledby="gcode-clear-title">
+      <form method="dialog">
+        <div class="move-title" id="gcode-clear-title">Clear loaded G-code?</div>
+        <p class="confirm-text">The program and its simulation will be removed.</p>
+        <div class="move-actions">
+          <button type="submit" class="move-cancel" value="cancel" autofocus>Cancel</button>
+          <button type="submit" class="connect-btn confirm-danger" value="clear">Clear</button>
+        </div>
+      </form>
+    </dialog>
 
     <div class="move-popup" id="move-popup" role="dialog" aria-labelledby="move-title" hidden>
       <div class="move-title" id="move-title">Move</div>
