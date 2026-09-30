@@ -211,11 +211,11 @@ user_inputs:
   digital6_pin: NO_PIN
 
 user_outputs:
-  analog0_pin: NO_PIN
+  analog0_pin: gpio.02
+  analog0_hz: 10
   analog1_pin: NO_PIN
   analog2_pin: NO_PIN
   analog3_pin: NO_PIN
-  analog0_hz: 5000
   analog1_hz: 5000
   analog2_hz: 5000
   analog3_hz: 5000

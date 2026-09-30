@@ -194,9 +194,9 @@ async function updateHotwireState() {
   pwmVal = Math.min(100, Math.max(0, pwmVal));
 
   if (isHotwireOn) {
-    await sendGcode(`SET_PIN PIN=hotwire VALUE=${pwmVal}`);
+    await sendGcode(`M67 E0 Q${pwmVal}`);
   } else {
-    await sendGcode('SET_PIN PIN=hotwire VALUE=0');
+    await sendGcode('M67 E0 Q0');
   }
 }
 
