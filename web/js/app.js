@@ -188,27 +188,29 @@ function setHomingAvailable(axis, available) {
   btn.title = available ? `Home ${axis} ($H${axis})` : `No homing configured for ${axis}`;
 }
 
+// The hotwire is FluidNC's Laser spindle, with speed_map making S the duty cycle in %.
+// Laser mode holds the output at 0 unless the modal motion is G1/G2/G3, so select G1
+// (no axis words, so nothing moves) to turn it on while idle.
 async function updateHotwireState() {
   let pwmVal = parseFloat(inputHotwirePwm.value);
   if (isNaN(pwmVal)) pwmVal = 0;
   pwmVal = Math.min(100, Math.max(0, pwmVal));
 
   if (isHotwireOn) {
-    await sendGcode(`M67 E0 Q${pwmVal}`);
+    await sendGcode(`G1 M3 S${pwmVal}`);
   } else {
-    await sendGcode('M67 E0 Q0');
+    await sendGcode('M5');
   }
 }
 
+function showHotwireState(on) {
+  isHotwireOn = on;
+  btnHotwireToggle.textContent = on ? 'ON' : 'OFF';
+  btnHotwireToggle.classList.toggle('active', on);
+}
+
 btnHotwireToggle.addEventListener('click', async () => {
-  isHotwireOn = !isHotwireOn;
-  if (isHotwireOn) {
-    btnHotwireToggle.textContent = 'ON';
-    btnHotwireToggle.classList.add('active');
-  } else {
-    btnHotwireToggle.textContent = 'OFF';
-    btnHotwireToggle.classList.remove('active');
-  }
+  showHotwireState(!isHotwireOn);
   await updateHotwireState();
 });
 
@@ -257,13 +259,19 @@ function parseStatusReport(text) {
   const fields = m[1].split('|');
   machineState = fields[0];
   let mpos = null, wpos = null;
+  let hasOverrides = false, spindleOn = false;
   for (const f of fields.slice(1)) {
     const [key, val] = f.split(':');
     const nums = (val || '').split(',').map(parseFloat);
     if (key === 'MPos') mpos = nums;
     else if (key === 'WPos') wpos = nums;
     else if (key === 'WCO') wco = nums;
+    else if (key === 'Ov') hasOverrides = true;
+    else if (key === 'A') spindleOn = /[SC]/.test(val || '');
   }
+  // Accessory state (A:) is only reported alongside overrides (Ov:), and omitted when
+  // nothing is on; follow it so the toggle reflects M5/reset/alarm from elsewhere
+  if (hasOverrides && spindleOn !== isHotwireOn) showHotwireState(spindleOn);
   const pos = wpos || (mpos && mpos.map((v, i) => v - (wco[i] || 0)));
   const mach = mpos || (wpos && wpos.map((v, i) => v + (wco[i] || 0)));
   if (mach) {

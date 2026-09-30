@@ -211,8 +211,8 @@ user_inputs:
   digital6_pin: NO_PIN
 
 user_outputs:
-  analog0_pin: gpio.02
-  analog0_hz: 10
+  analog0_pin: NO_PIN
+  analog0_hz: 5000
   analog1_pin: NO_PIN
   analog2_pin: NO_PIN
   analog3_pin: NO_PIN
@@ -221,7 +221,7 @@ user_outputs:
   analog3_hz: 5000
   digital0_pin: gpio.26
   digital1_pin: gpio.27
-  digital2_pin: gpio.2
+  digital2_pin: NO_PIN
   digital3_pin: NO_PIN
 
 #Pendant:
@@ -237,27 +237,17 @@ user_outputs:
 # report_interval_ms: 75
 # uart_num: 2
 
-#Laser:
-#  pwm_hz: 5000
-#  output_pin: gpio.27
-#  enable_pin: NO_PIN
-#  disable_with_s0: false
-#  s0_with_disable: true
-#  tool_num: 0
-#  speed_map: 0=0.000% 255=100.000%
-#  off_on_alarm: true
-
-# pwm:
-#  pwm_hz: 5000
-#  direction_pin: gpio.26
-#  output_pin: gpio.27
-#  enable_pin: NO_PIN
-#  disable_with_s0: false
-#  s0_with_disable: true
-#  spinup_ms: 0
-#  spindown_ms: 0
-#  tool_num: 0
-#  speed_map: 0=0.000% 1000=100.000%
-#  off_on_alarm: false
+# Hotwire as a laser-mode spindle: S changes apply without stopping motion.
+# M3 S<percent> is on during G1/G2/G3 (and jogs); G0 moves run with it off.
+# S maps 1:1 to duty cycle. Laser requires pwm_hz >= 1000 and has no spinup_ms.
+Laser:
+  pwm_hz: 1000
+  output_pin: gpio.02
+  enable_pin: NO_PIN
+  disable_with_s0: false
+  s0_with_disable: true
+  tool_num: 0
+  speed_map: 0=0.000% 100=100.000%
+  off_on_alarm: true
 
 # Inputs left to right gpoi.25/33/32/35/34/39/36

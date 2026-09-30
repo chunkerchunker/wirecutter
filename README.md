@@ -26,11 +26,9 @@ Once installed, and once wifi is configured (also via Chrome installer), access 
 
 ### hotwire control
 
-user_outputs:
-  analog0_pin: gpio.XX  # Replace XX with your specific output pin number
-  analog0_hz: 50        # Sets the frequency to 50Hz (or lower, like 10)
+The hotwire is configured as FluidNC's Laser spindle (`Laser:` in `config.yaml`), with `speed_map: 0=0% 100=100%` so `S` is the duty cycle in percent. Laser mode applies `S` changes without stopping motion, so power can vary mid-cut.
+- `G1 M3 S25` — 25% duty cycle (`G1` needed when idle: laser mode holds the output at 0 unless the modal motion is G1/G2/G3)
+- `S40` on a `G1` line — change power mid-cut
+- `M5` — off (also forced off on alarm via `off_on_alarm: true`)
 
-Once configured, you can control the duty cycle via G-code using the M67 command. For example:
-⚬	M67 E0 Q25 — Sets analog0 to a 25% duty cycle.
-⚬	M67 E0 Q100 — Sets analog0 to 100% (fully on).
-⚬	M67 E0 Q0 — Turns the output off.
+`G0` moves run with the wire off; the output returns to `S` on the next `G1`/`G2`/`G3` move. Jogs (`$J=`) keep it at `S`. There is no spin-up delay; add a dwell (`G4 P2`) after `M3` to let the wire heat.
