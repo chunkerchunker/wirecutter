@@ -41,7 +41,7 @@
 
 
 
-    <div class="settings-bar">
+    <div class="settings-bar" id="settings-bar" data-speed-mode="rapid">
       <div class="settings-column">
         <div class="settings-column-title">
           <div class="axis-head">
@@ -56,10 +56,17 @@
             <span class="pos-row" title="Work position (click to move)"><span class="pos-tag">W</span><span class="pos-badge" id="pos-knife-z-w">0.00mm</span></span>
           </span>
         </div>
-        <div class="setting-row">
-          <span class="setting-label">Speed:</span>
+        <div class="setting-row" data-speed="rapid">
+          <span class="setting-label">Rapid:</span>
           <div class="input-with-unit">
-            <input type="number" id="feedrate-knife" value="6500" min="10" max="6500" step="100">
+            <input type="number" id="rapid-knife" value="6500" min="10" max="6500" step="100">
+            <span class="unit">mm/m</span>
+          </div>
+        </div>
+        <div class="setting-row" data-speed="cut">
+          <span class="setting-label">Cut:</span>
+          <div class="input-with-unit">
+            <input type="number" id="cut-knife" value="300" min="10" max="6500" step="100">
             <span class="unit">mm/m</span>
           </div>
         </div>
@@ -86,10 +93,17 @@
             <span class="pos-row" title="Work position (click to move)"><span class="pos-tag">W</span><span class="pos-badge" id="pos-bed-y-w">0.00mm</span></span>
           </span>
         </div>
-        <div class="setting-row">
-          <span class="setting-label">Speed:</span>
+        <div class="setting-row" data-speed="rapid">
+          <span class="setting-label">Rapid:</span>
           <div class="input-with-unit">
-            <input type="number" id="feedrate-bed" value="6500" min="100" max="6500" step="100">
+            <input type="number" id="rapid-bed" value="6500" min="100" max="6500" step="100">
+            <span class="unit">mm/m</span>
+          </div>
+        </div>
+        <div class="setting-row" data-speed="cut">
+          <span class="setting-label">Cut:</span>
+          <div class="input-with-unit">
+            <input type="number" id="cut-bed" value="300" min="100" max="6500" step="100">
             <span class="unit">mm/m</span>
           </div>
         </div>
@@ -116,10 +130,17 @@
             <span class="pos-row" title="Work position (click to move)"><span class="pos-tag">W</span><span class="pos-badge" id="pos-rotary-a-w">0.0°</span></span>
           </span>
         </div>
-        <div class="setting-row">
-          <span class="setting-label">Speed:</span>
+        <div class="setting-row" data-speed="rapid">
+          <span class="setting-label">Rapid:</span>
           <div class="input-with-unit">
-            <input type="number" id="feedrate-rotary" value="209" min="1" max="209" step="5">
+            <input type="number" id="rapid-rotary" value="209" min="1" max="209" step="5">
+            <span class="unit">°/s</span>
+          </div>
+        </div>
+        <div class="setting-row" data-speed="cut">
+          <span class="setting-label">Cut:</span>
+          <div class="input-with-unit">
+            <input type="number" id="cut-rotary" value="10" min="1" max="209" step="5">
             <span class="unit">°/s</span>
           </div>
         </div>
@@ -137,13 +158,20 @@
         <div class="setting-row">
           <span class="setting-label">PWM%:</span>
           <div class="input-with-unit">
-            <input type="number" id="hotwire-pwm" value="4" min="0" max="100" step="1">
+            <input type="number" id="hotwire-pwm" value="75" min="0" max="100" step="1">
             <span class="unit">%</span>
           </div>
         </div>
         <div class="setting-row">
           <span class="setting-label">Power:</span>
           <button type="button" class="toggle-btn" id="hotwire-toggle">OFF</button>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Speed:</span>
+          <div class="speed-switch" id="speed-switch" role="group" aria-label="Jog speed">
+            <button type="button" data-mode="rapid" aria-pressed="true" title="Jog and move at rapid speeds">Rapid</button>
+            <button type="button" data-mode="cut" aria-pressed="false" title="Jog and move at cutting speeds">Cut</button>
+          </div>
         </div>
       </div>
     </div>
@@ -376,7 +404,7 @@
       </div>
     </div>
 
-    <div class="terminal-card">
+    <div class="terminal-card" id="terminal-card">
       <div class="terminal-header">
         <span>Terminal</span>
         <div class="terminal-actions">
@@ -385,14 +413,25 @@
             <span>Status Polling</span>
           </label>
           <span id="terminal-clear" style="cursor: pointer;">Clear</span>
+          <button type="button" class="terminal-max-btn" id="terminal-max" title="Maximize terminal"
+            aria-label="Maximize terminal" aria-pressed="false">
+            <svg class="icon-maximize" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+            </svg>
+            <svg class="icon-restore" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+            </svg>
+          </button>
         </div>
       </div>
       <div class="terminal-output" id="terminal-output">
         <div class="terminal-line system">Ready. Click Connect to link to the FluidNC controller.</div>
       </div>
       <form class="terminal-input-bar" id="terminal-form">
-        <input type="text" class="terminal-input" id="terminal-input" placeholder="Send G-code command..."
-          autocomplete="off">
+        <textarea class="terminal-input" id="terminal-input" rows="1" placeholder="Send G-code command..."
+          autocomplete="off" spellcheck="false" title="Enter to send, Option-Enter for a new line"></textarea>
         <button type="submit" class="terminal-send">Send</button>
       </form>
     </div>

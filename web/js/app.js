@@ -25,6 +25,7 @@ let holdTimer = null;
 let isHoldJogging = false;
 const HOLD_MS = 250;           // press longer than this => continuous jog until release
 const CONTINUOUS_JOG = 1000;   // jog distance for press-and-hold; cancelled on release
+const MAX_TERMINAL_LINES = 2000;  // oldest lines are dropped beyond this
 
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
@@ -49,12 +50,18 @@ const bedDownBtn = document.getElementById('btn-bed-down');
 const rotaryCcwBtn = document.getElementById('btn-rotary-ccw');
 const rotaryCwBtn = document.getElementById('btn-rotary-cw');
 
-const inputKnifeFeedrate = document.getElementById('feedrate-knife');
+const speedInputs = (kind) => ({
+  rapid: document.getElementById(`rapid-${kind}`),
+  cut: document.getElementById(`cut-${kind}`),
+});
 const inputKnifeDistance = document.getElementById('distance-knife');
-const inputBedFeedrate = document.getElementById('feedrate-bed');
 const inputBedDistance = document.getElementById('distance-bed');
-const inputRotaryFeedrate = document.getElementById('feedrate-rotary');
 const inputRotaryDistance = document.getElementById('distance-rotary');
+
+// Jogs and moves use the rapid or cut speed of each axis, per the Speed toggle
+const settingsBar = document.getElementById('settings-bar');
+const speedSwitch = document.getElementById('speed-switch');
+let speedMode = 'rapid';
 
 const posEl = (id) => ({ m: document.getElementById(`${id}-m`), w: document.getElementById(`${id}-w`) });
 const posKnifeZ = posEl('pos-knife-z');
@@ -308,6 +315,7 @@ function logTerminal(text, type = '') {
   line.className = 'terminal-line ' + type;
   line.textContent = text;
   terminalOutput.appendChild(line);
+  while (terminalOutput.childElementCount > MAX_TERMINAL_LINES) terminalOutput.firstElementChild.remove();
   terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
 
@@ -468,9 +476,9 @@ if (togglePoll) {
 // Tap: one $J step of the configured distance.
 // Hold: after HOLD_MS a long $J is queued behind the step; release sends jog-cancel.
 const JOG_AXES = {
-  knife: { feed: inputKnifeFeedrate, dist: inputKnifeDistance },
-  bed: { feed: inputBedFeedrate, dist: inputBedDistance },
-  rotary: { feed: inputRotaryFeedrate, dist: inputRotaryDistance },
+  knife: { feed: speedInputs('knife'), dist: inputKnifeDistance },
+  bed: { feed: speedInputs('bed'), dist: inputBedDistance },
+  rotary: { feed: speedInputs('rotary'), dist: inputRotaryDistance },
 };
 
 // delta in mm, feed in mm/min (rotary values are converted from degrees before this)
@@ -488,9 +496,22 @@ function jogCommand(kind, delta, feed) {
   }
 }
 
-// Speed input for `kind` in mm/min, clamped to the axis max rate
+function setSpeedMode(mode) {
+  speedMode = mode;
+  settingsBar.dataset.speedMode = mode;
+  for (const btn of speedSwitch.querySelectorAll('[data-mode]')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.mode === mode));
+  }
+}
+
+speedSwitch.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-mode]');
+  if (btn) setSpeedMode(btn.dataset.mode);
+});
+
+// Speed input for `kind` (in the current speed mode) in mm/min, clamped to the axis max rate
 function jogFeed(kind) {
-  let feed = parseFloat(JOG_AXES[kind].feed.value);
+  let feed = parseFloat(JOG_AXES[kind].feed[speedMode].value);
   if (kind === 'rotary') feed *= 60 * MM_PER_DEG;  // °/s -> mm/min
   if (isNaN(feed) || feed <= 0) feed = MAX_FEED;
   return Math.min(feed, MAX_FEED);
@@ -623,17 +644,137 @@ homeBtn.addEventListener('click', async () => {
   await sendGcode('$H');
 });
 
+// Command history, shell-style: Up/Down step through sent commands; stepping past
+// the newest restores the unsent draft. Persisted across reloads.
+const MAX_HISTORY = 100;
+let cmdHistory = [];
+let historyIndex = 0;  // == cmdHistory.length when not browsing
+let historyDraft = '';
+
+try {
+  cmdHistory = JSON.parse(localStorage.getItem('terminal-history')) || [];
+} catch (e) { }
+historyIndex = cmdHistory.length;
+
+function addToHistory(cmd) {
+  if (cmdHistory[cmdHistory.length - 1] !== cmd) {
+    cmdHistory.push(cmd);
+    cmdHistory.splice(0, cmdHistory.length - MAX_HISTORY);
+    try {
+      localStorage.setItem('terminal-history', JSON.stringify(cmdHistory));
+    } catch (e) { }
+  }
+  historyIndex = cmdHistory.length;
+  historyDraft = '';
+}
+
+// The input grows with its content (up to its CSS max-height)
+function setTerminalInput(text) {
+  terminalInput.value = text;
+  autosizeTerminalInput();
+}
+
+function autosizeTerminalInput() {
+  terminalInput.style.height = 'auto';
+  terminalInput.style.height = `${terminalInput.scrollHeight}px`;
+}
+
+terminalInput.addEventListener('input', autosizeTerminalInput);
+
+terminalInput.addEventListener('keydown', (e) => {
+  if (e.isComposing) return;
+
+  // Enter sends; Option-Enter inserts a newline (Shift-Enter does natively)
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (e.altKey) {
+      terminalInput.setRangeText('\n', terminalInput.selectionStart, terminalInput.selectionEnd, 'end');
+      autosizeTerminalInput();
+    } else {
+      terminalForm.requestSubmit();
+    }
+    return;
+  }
+
+  // Up/Down browse history only from the first/last line, so multi-line input stays editable
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+  const { value, selectionStart, selectionEnd } = terminalInput;
+  if (selectionStart !== selectionEnd) return;
+  if (e.key === 'ArrowUp' ? value.lastIndexOf('\n', selectionStart - 1) !== -1 : value.indexOf('\n', selectionStart) !== -1) return;
+  const next = historyIndex + (e.key === 'ArrowUp' ? -1 : 1);
+  if (next < 0 || next > cmdHistory.length) return;
+  e.preventDefault();
+  if (historyIndex === cmdHistory.length) historyDraft = value;
+  historyIndex = next;
+  setTerminalInput(next === cmdHistory.length ? historyDraft : cmdHistory[next]);
+  terminalInput.setSelectionRange(terminalInput.value.length, terminalInput.value.length);
+});
+
+// Multi-line input is sent one line at a time, paced like a G-code run and with the
+// same lockout; STOP or Reset aborts it
+async function sendTerminalInput(text) {
+  const lines = text.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length <= 1) {
+    if (lines.length) await sendGcode(lines[0]);
+    return;
+  }
+  if (isStreaming) return;
+  if (!isConnected() && !(await connectController())) return;
+
+  isStreaming = true;
+  stopRequested = false;
+  setRunLock(true);
+  runGcodeBtn.disabled = true;
+  if (!(await streamLines(lines, { silent: false }))) {
+    logTerminal('--- Terminal send aborted ---', 'error');
+  }
+  isStreaming = false;
+  setRunLock(false);
+  runGcodeBtn.disabled = gcodeLines.length === 0;
+}
+
 terminalForm.addEventListener('submit', (e) => {
   e.preventDefault();
-  const cmd = terminalInput.value;
-  if (cmd) {
-    sendGcode(cmd);
-    terminalInput.value = '';
+  // While streaming, the Send button is a Stop button
+  if (isStreaming) {
+    terminalSend.disabled = true;
+    terminalSend.textContent = 'Stopping...';
+    stopMotion();
+    return;
+  }
+  const text = terminalInput.value;
+  if (text.trim()) {
+    addToHistory(text.trim());
+    setTerminalInput('');
+    sendTerminalInput(text);
   }
 });
 
 terminalClear.addEventListener('click', () => {
   terminalOutput.innerHTML = '';
+});
+
+// Maximize: the terminal card covers the whole window until restored (button or Esc)
+const terminalCard = document.getElementById('terminal-card');
+const terminalMaxBtn = document.getElementById('terminal-max');
+
+function setTerminalMaximized(max) {
+  const atBottom = terminalOutput.scrollHeight - terminalOutput.scrollTop - terminalOutput.clientHeight < 2;
+  terminalCard.classList.toggle('maximized', max);
+  document.body.classList.toggle('terminal-maximized', max);
+  const label = max ? 'Restore terminal' : 'Maximize terminal';
+  terminalMaxBtn.title = label;
+  terminalMaxBtn.setAttribute('aria-label', label);
+  terminalMaxBtn.setAttribute('aria-pressed', String(max));
+  if (atBottom) terminalOutput.scrollTop = terminalOutput.scrollHeight;
+}
+
+terminalMaxBtn.addEventListener('click', () => {
+  setTerminalMaximized(!terminalCard.classList.contains('maximized'));
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && terminalCard.classList.contains('maximized')) setTerminalMaximized(false);
 });
 
 // --- MOVE TO POSITION ---
@@ -778,6 +919,7 @@ const gcodeStatusText = document.getElementById('gcode-status-text');
 let gcodeLines = [];
 let gcodeLineNumbers = [];  // file line index of each entry in gcodeLines, for simulation sync
 let isRunningGcode = false;
+let isStreaming = false;  // a G-code run or a multi-line terminal send is in progress
 let isPaused = false;
 let stopRequested = false;
 
@@ -808,7 +950,7 @@ function loadGcodeFile(file) {
       <strong>Commands:</strong> ${gcodeLines.length}
     `;
 
-    runGcodeBtn.disabled = gcodeLines.length === 0 || isRunningGcode;
+    runGcodeBtn.disabled = gcodeLines.length === 0 || isStreaming;
     if (gcodeLines.length === 0) {
       gcodeInfo.innerHTML += '<br><span style="color: var(--danger-color);">No valid G-code commands found.</span>';
     }
@@ -896,7 +1038,7 @@ runGcodeBtn.addEventListener('click', () => {
 });
 
 async function runProgram() {
-  if (gcodeLines.length === 0 || isRunningGcode) return;
+  if (gcodeLines.length === 0 || isStreaming) return;
 
   if (!isConnected()) {
     const ok = await connectController();
@@ -904,6 +1046,7 @@ async function runProgram() {
   }
 
   isRunningGcode = true;
+  isStreaming = true;
   isPaused = false;
   stopRequested = false;
   runGcodeBtn.textContent = 'Pause';
@@ -938,43 +1081,22 @@ async function runProgram() {
   // Send a newline to clear buffer
   await sendGcode('', true);
 
-  for (let i = 0; i < total; i++) {
-    if (stopRequested) {
-      logTerminal('--- G-code run aborted by user ---', 'error');
-      break;
-    }
-
-    // Wait if too many unacknowledged commands
-    while (pendingOks >= 2) {
-      await new Promise(r => setTimeout(r, 10));
-    }
-
-    // Hold back further lines while paused, checked right before sending so a line
-    // waiting on backpressure doesn't slip out after the feed hold
-    while (isPaused && !stopRequested) {
-      await new Promise(r => setTimeout(r, 50));
-    }
-    if (stopRequested) {
-      logTerminal('--- G-code run aborted by user ---', 'error');
-      break;
-    }
-
-    const cmd = linesToSend[i];
-    if (cmd) {
-      await sendGcode(cmd, true); // silent send
+  const completed = await streamLines(linesToSend, {
+    onSent: (i) => {
       simPanel.follow(fileLineOf[i]);
-    }
-    sent++;
-
-    if (i % 5 === 0 || i === total - 1) {
-      const percent = ((sent / total) * 100).toFixed(1);
-      const elapsed = ((performance.now() - startTime) / 1000);
-      gcodeProgressFill.style.width = percent + '%';
-      gcodeStatusText.textContent = `Sent ${sent}/${total} (${percent}%) | Elapsed: ${elapsed.toFixed(1)}s`;
-    }
-  }
+      const sent = i + 1;
+      if (i % 5 === 0 || sent === total) {
+        const percent = ((sent / total) * 100).toFixed(1);
+        const elapsed = ((performance.now() - startTime) / 1000);
+        gcodeProgressFill.style.width = percent + '%';
+        gcodeStatusText.textContent = `Sent ${sent}/${total} (${percent}%) | Elapsed: ${elapsed.toFixed(1)}s`;
+      }
+    },
+  });
+  if (!completed) logTerminal('--- G-code run aborted by user ---', 'error');
 
   isRunningGcode = false;
+  isStreaming = false;
   isPaused = false;
   runGcodeBtn.textContent = 'Run G-code';
   gcodeFileInput.disabled = false;
@@ -996,6 +1118,25 @@ async function runProgram() {
      togglePoll.checked = true;
      togglePoll.dispatchEvent(new Event('change'));
   }
+}
+
+// Send lines in order, keeping at most two unacknowledged so the controller's input
+// buffer can't overflow. Lines are held back while paused, checked right before
+// sending so a line waiting on backpressure doesn't slip out after the feed hold.
+// Returns false if a stop was requested before every line was sent.
+async function streamLines(lines, { silent = true, onSent } = {}) {
+  for (let i = 0; i < lines.length; i++) {
+    while (pendingOks >= 2 && !stopRequested) {
+      await new Promise(r => setTimeout(r, 10));
+    }
+    while (isPaused && !stopRequested) {
+      await new Promise(r => setTimeout(r, 50));
+    }
+    if (stopRequested) return false;
+    await sendGcode(lines[i], silent);
+    onSent?.(i);
+  }
+  return true;
 }
 
 // While a program streams, lock out controls that would inject commands between its
@@ -1021,9 +1162,12 @@ function setRunLock(locked) {
     el.inert = locked;
     el.classList.toggle('run-locked', locked);
   }
+  // Send turns into Stop, so a run can be stopped from the terminal (even maximized)
   terminalInput.disabled = locked;
-  terminalSend.disabled = locked;
-  terminalInput.placeholder = locked ? 'Disabled while G-code is running' : 'Send G-code command...';
+  terminalSend.disabled = false;
+  terminalSend.textContent = locked ? 'Stop' : 'Send';
+  terminalSend.classList.toggle('stop', locked);
+  terminalInput.placeholder = locked ? 'Disabled while G-code is sending' : 'Send G-code command...';
 }
 
 // Leaving the page mid-run would silently stop streaming partway through the program.
@@ -1031,13 +1175,13 @@ function setRunLock(locked) {
 // feed-hold on the way out so the machine stops cleanly rather than finishing
 // whatever was already queued and halting at an arbitrary point.
 window.addEventListener('beforeunload', (e) => {
-  if (!isRunningGcode) return;
+  if (!isStreaming) return;
   e.preventDefault();
   e.returnValue = '';
 });
 
 window.addEventListener('pagehide', () => {
-  if (!isRunningGcode) return;
+  if (!isStreaming) return;
   sendRealtime(RT_JOG_CANCEL);
   sendRealtime(RT_FEED_HOLD);
 });
@@ -1050,8 +1194,8 @@ let isStopping = false;
 
 async function stopMotion() {
   stopJog();
+  if (isStreaming) stopRequested = true;
   if (isRunningGcode) {
-    stopRequested = true;
     stopGcodeBtn.textContent = 'Stopping...';
     stopGcodeBtn.disabled = true;
   }
@@ -1090,7 +1234,7 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
     return;
   }
   stopJog();
-  if (isRunningGcode) stopRequested = true;
+  if (isStreaming) stopRequested = true;
   sendRealtime(RT_RESET);
   pendingOks = 0;
   logTerminal('Soft reset.', 'system');
@@ -1101,7 +1245,7 @@ document.getElementById('btn-sleep').addEventListener('click', () => sendGcode('
 // $Bye reboots the controller, which is what reloads config.yaml (a soft reset doesn't).
 // The socket drops during the reboot; keep trying to reconnect until it's back.
 document.getElementById('btn-restart').addEventListener('click', async () => {
-  if (!isConnected() || isRunningGcode) return;
+  if (!isConnected() || isStreaming) return;
   const ok = await confirmAction(
     'Restart controller?',
     'Reboots the board and reloads config.yaml. Motion and the hotwire stop, and axes will need homing again.',

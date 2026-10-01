@@ -472,6 +472,53 @@ html {
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
 }
 
+/* Rapid / Cut jog speed toggle */
+.speed-switch {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+}
+
+.speed-switch button {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.speed-switch button:hover {
+  color: var(--text-primary);
+}
+
+.speed-switch button[aria-pressed="true"] {
+  background: var(--btn-hover);
+  color: var(--text-primary);
+}
+
+.speed-switch button[data-mode="cut"][aria-pressed="true"] {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warning-color);
+}
+
+/* Dim the speed rows of the inactive mode; mark the active cut speeds */
+.settings-bar[data-speed-mode="rapid"] .setting-row[data-speed="cut"],
+.settings-bar[data-speed-mode="cut"] .setting-row[data-speed="rapid"] {
+  opacity: 0.45;
+}
+
+.settings-bar[data-speed-mode="cut"] .setting-row[data-speed="cut"] .input-with-unit {
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
 .panel-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -700,6 +747,51 @@ html {
   margin: 0;
 }
 
+.terminal-max-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.terminal-max-btn:hover {
+  color: var(--text-primary);
+  background: var(--btn-bg);
+}
+
+.terminal-max-btn .icon-restore,
+.terminal-card.maximized .terminal-max-btn .icon-maximize {
+  display: none;
+}
+
+.terminal-card.maximized .terminal-max-btn .icon-restore {
+  display: block;
+}
+
+/* Maximized terminal fills the viewport over the rest of the page */
+.terminal-card.maximized {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  border: none;
+  border-radius: 0;
+  background: #0f172a;
+}
+
+.terminal-card.maximized .terminal-output {
+  flex: 1;
+  height: auto;
+}
+
+body.terminal-maximized {
+  overflow: hidden;
+}
+
 .terminal-output {
   height: 120px;
   padding: 10px 14px;
@@ -745,7 +837,10 @@ html {
   color: #fff;
   font-family: monospace;
   font-size: 0.85rem;
+  line-height: 1.4;
   outline: none;
+  resize: none;
+  max-height: calc(10 * 1.4em + 16px);  /* grows with its content up to 10 lines */
 }
 
 .terminal-send {
@@ -761,6 +856,16 @@ html {
 .terminal-send:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
+}
+
+.terminal-send.stop {
+  background: var(--danger-color);
+  color: #fff;
+  font-weight: 600;
+}
+
+.terminal-send.stop:hover:not(:disabled) {
+  background: #dc2626;
 }
 
 @media (max-width: 680px) {
