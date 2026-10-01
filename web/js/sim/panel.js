@@ -20,7 +20,7 @@ export function initSimPanel() {
   const status = $('sim-status');
   const syncCb = $('sim-sync');
 
-  const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+  let worker = null;  // created on first use, to keep it out of the page-load requests
   let viewer = null;
   let lines = [];
   let moves = [];
@@ -139,20 +139,26 @@ export function initSimPanel() {
     if (!moves.length) return;
     const id = ++simId;
     status.textContent = 'Simulating…';
-    worker.postMessage({ id, moves, stock: readStock() });
+    ensureWorker().postMessage({ id, moves, stock: readStock() });
   }
 
-  worker.onmessage = async ({ data }) => {
-    if (data.id !== simId) return;  // stale result from an earlier stock size
-    const v = await ensureViewer();
-    v.setProgram({ moves, grid: data.grid, removedAt: data.removedAt });
-    status.textContent = `${moves.length} moves · voxel ${data.grid.cs.toFixed(2)} mm`;
-    showTime(time);
-  };
+  function ensureWorker() {
+    if (worker) return worker;
+    worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 
-  worker.onerror = (e) => {
-    status.textContent = `Simulation failed: ${e.message}`;
-  };
+    worker.onmessage = async ({ data }) => {
+      if (data.id !== simId) return;  // stale result from an earlier stock size
+      const v = await ensureViewer();
+      v.setProgram({ moves, grid: data.grid, removedAt: data.removedAt });
+      status.textContent = `${moves.length} moves · voxel ${data.grid.cs.toFixed(2)} mm`;
+      showTime(time);
+    };
+
+    worker.onerror = (e) => {
+      status.textContent = `Simulation failed: ${e.message}`;
+    };
+    return worker;
+  }
 
   playBtn.addEventListener('click', () => setPlaying(!playing));
   scrub.addEventListener('input', () => {

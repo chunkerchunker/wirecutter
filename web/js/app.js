@@ -1,5 +1,6 @@
 import { MM_PER_DEG, MAX_FEED } from './machine.js';
 import { initSimPanel } from './sim/panel.js';
+import { FIELDS, getPath, builtinSettings, loadSettings, SETTINGS_URL } from './settings.js';
 
 // FluidNC (v4) serves its WebSocket at "/" on the HTTP port, the same endpoint
 // ESP3D-WEBUI uses. Output arrives as binary frames; text frames are control
@@ -25,7 +26,7 @@ let holdTimer = null;
 let isHoldJogging = false;
 const HOLD_MS = 250;           // press longer than this => continuous jog until release
 const CONTINUOUS_JOG = 1000;   // jog distance for press-and-hold; cancelled on release
-const MAX_TERMINAL_LINES = 2000;  // oldest lines are dropped beyond this
+let maxTerminalLines;  // oldest lines are dropped beyond this (from settings)
 
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
@@ -315,7 +316,7 @@ function logTerminal(text, type = '') {
   line.className = 'terminal-line ' + type;
   line.textContent = text;
   terminalOutput.appendChild(line);
-  while (terminalOutput.childElementCount > MAX_TERMINAL_LINES) terminalOutput.firstElementChild.remove();
+  while (terminalOutput.childElementCount > maxTerminalLines) terminalOutput.firstElementChild.remove();
   terminalOutput.scrollTop = terminalOutput.scrollHeight;
 }
 
@@ -646,7 +647,7 @@ homeBtn.addEventListener('click', async () => {
 
 // Command history, shell-style: Up/Down step through sent commands; stepping past
 // the newest restores the unsent draft. Persisted across reloads.
-const MAX_HISTORY = 100;
+let maxHistory;  // from settings
 let cmdHistory = [];
 let historyIndex = 0;  // == cmdHistory.length when not browsing
 let historyDraft = '';
@@ -659,7 +660,7 @@ historyIndex = cmdHistory.length;
 function addToHistory(cmd) {
   if (cmdHistory[cmdHistory.length - 1] !== cmd) {
     cmdHistory.push(cmd);
-    cmdHistory.splice(0, cmdHistory.length - MAX_HISTORY);
+    cmdHistory.splice(0, cmdHistory.length - maxHistory);
     try {
       localStorage.setItem('terminal-history', JSON.stringify(cmdHistory));
     } catch (e) { }
@@ -1266,6 +1267,30 @@ document.getElementById('btn-restart').addEventListener('click', async () => {
   }
 });
 stopGcodeBtn.addEventListener('click', stopMotion);
+
+// --- SETTINGS ---
+// Built-in defaults apply immediately; settings.json from the controller (edited on
+// config.html) replaces them once loaded. Edits on this page last until reload.
+function applySettings(settings) {
+  for (const f of FIELDS) {
+    if (!f.input) continue;
+    const el = document.getElementById(f.input);
+    Object.assign(el, { min: f.min, max: f.max, step: f.step, value: getPath(settings, f.path) });
+  }
+  setSpeedMode(settings.speedMode);
+  maxTerminalLines = settings.terminal.maxLines;
+  maxHistory = settings.terminal.maxHistory;
+  cmdHistory.splice(0, cmdHistory.length - maxHistory);
+  historyIndex = cmdHistory.length;
+}
+
+applySettings(builtinSettings());
+loadSettings()
+  .then(({ settings, problems }) => {
+    applySettings(settings);
+    for (const p of problems) logTerminal(`${SETTINGS_URL}: ${p}; using the built-in default.`, 'error');
+  })
+  .catch((err) => logTerminal(`Couldn't load ${SETTINGS_URL}: ${err.message}. Using built-in defaults.`, 'error'));
 
 // Attempt auto-connecting on load & start status polling
 window.addEventListener('DOMContentLoaded', () => {

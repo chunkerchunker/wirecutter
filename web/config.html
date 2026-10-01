@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hotwire Cutter - Defaults</title>
+  <link rel="stylesheet" href="css/config.css">
+</head>
+
+<body>
+
+  <div class="app-container">
+    <div class="header">
+      <a class="header-link" href="index.html" title="Back to controls" aria-label="Back to controls">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </a>
+      <h1>Defaults</h1>
+    </div>
+
+    <p class="config-intro">Saved as <code>settings.json</code> on the controller's SD card. The control page
+      loads them when it opens.</p>
+
+    <form class="config-grid" id="config-form" novalidate></form>
+
+    <div class="config-actions">
+      <span class="config-status" id="config-status" role="status"></span>
+      <button type="button" class="mach-btn" id="config-builtin" title="Fill in the built-in defaults (not saved until you Save)">Built-in defaults</button>
+      <button type="button" class="mach-btn" id="config-revert" title="Reload the saved settings">Revert</button>
+      <button type="submit" class="config-save" id="config-save" form="config-form" disabled>Save</button>
+    </div>
+
+    <details class="config-raw">
+      <summary>Effective settings (JSON)</summary>
+      <pre id="config-raw"></pre>
+    </details>
+  </div>
+
+  <script type="module" src="js/config.js"></script>
+</body>
+
+</html>

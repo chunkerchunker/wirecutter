@@ -20,7 +20,8 @@ Once installed, and once wifi is configured (also via Chrome installer), access 
 
 `web/` is a static page served from the controller's SD card over FluidNC's WebDAV.
 
-- `just deploy` uploads it (gzipped) to `http://hotwire.local/sd/hotwire/index.html`
+- `just deploy` bundles it and uploads it (gzipped) to `http://hotwire.local/sd/index.html`. Bundling is required: the controller serves at most two files at once and answers a third concurrent request with a 404.
+- `config.html` edits the UI defaults, saved as `settings.json` on the SD card (`just settings-get` / `just settings-put`)
 - `just serve` runs it locally at http://127.0.0.1:8000 (ES modules don't load from `file://`)
 - `just vendor` rebuilds `web/vendor/three.js` (three.js subset for the G-code simulator)
 

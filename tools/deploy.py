@@ -6,9 +6,11 @@
 # [tool.uv]
 # exclude-newer = "1 week"
 # ///
-"""Upload web/ to the controller's SD card over WebDAV, gzipped, skipping unchanged files.
+"""Bundle web/ and upload it to the controller's SD card over WebDAV, gzipped, skipping unchanged files.
 
-FluidNC serves foo.js.gz for foo.js. The controller has no RTC (every file reports the same
+The upload is the bundled copy built by tools/build/bundle.mjs (one script and one stylesheet
+per page), because the controller can't serve more than two files at once. Files deployed
+earlier that are no longer part of the build are deleted. FluidNC serves foo.js.gz for foo.js. The controller has no RTC (every file reports the same
 mtime), so change detection uses a manifest of source hashes stored on the card at
 MANIFEST, plus a size check against a recursive PROPFIND to catch files changed or removed
 behind the manifest's back.
@@ -18,6 +20,8 @@ import gzip
 import hashlib
 import json
 import re
+import subprocess
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,6 +31,7 @@ import click
 
 MANIFEST = ".deploy-manifest"
 TIMEOUT = 30
+BUILD_DIR = Path(__file__).parent / "build"
 
 
 def request(method, url, data=None, headers=None):
@@ -59,6 +64,11 @@ def remote_listing(base):
     return files, dirs
 
 
+def bundle(out):
+    subprocess.run(["pnpm", "install", "--frozen-lockfile", "--silent"], cwd=BUILD_DIR, check=True)
+    subprocess.run(["pnpm", "run", "--silent", "bundle", str(out)], cwd=BUILD_DIR, check=True)
+
+
 def remote_manifest(base):
     try:
         return json.loads(request("GET", f"{base}/{MANIFEST}"))
@@ -69,13 +79,19 @@ def remote_manifest(base):
 @click.command()
 @click.option("--host", default="hotwire.local")
 @click.option("--dest", default="sd")
-@click.option("--src", default="web", type=click.Path(exists=True, file_okay=False, path_type=Path))
 @click.option("--all", "upload_all", is_flag=True, help="Upload every file, ignoring the manifest.")
-@click.option("-n", "--dry-run", is_flag=True, help="Show what would be uploaded.")
-def main(host, dest, src, upload_all, dry_run):
-    base = f"http://{host}/{dest}"
+@click.option("-n", "--dry-run", is_flag=True, help="Show what would be uploaded or deleted.")
+def main(host, dest, upload_all, dry_run):
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "web"
+        bundle(src)
+        deploy(f"http://{host}/{dest}", src, upload_all, dry_run)
+
+
+def deploy(base, src, upload_all, dry_run):
     remote_files, remote_dirs = remote_listing(base)
-    old = {} if upload_all else remote_manifest(base)
+    deployed = remote_manifest(base)
+    old = {} if upload_all else deployed
     new = {}
     pending = []
     for rel, path in local_files(src):
@@ -86,13 +102,20 @@ def main(host, dest, src, upload_all, dry_run):
         if old.get(rel) != entry or remote_files.get(rel + ".gz") != entry["size"]:
             pending.append((rel, gz))
 
-    if not pending:
+    # Only files this script deployed are removed; anything else on the card is left alone
+    stale = [rel for rel in deployed if rel not in new and rel + ".gz" in remote_files]
+
+    if not pending and not stale:
         click.echo("Up to date.")
         return
     uploaded = {k: v for k, v in old.items() if k in new}
     try:
+        for rel in stale:
+            click.echo(f"- {rel}")
+            if not dry_run:
+                request("DELETE", f"{base}/{rel}.gz")
         for rel, gz in pending:
-            click.echo(f"  {rel}")
+            click.echo(f"+ {rel}")
             if dry_run:
                 continue
             parts = rel.split("/")[:-1]
@@ -106,7 +129,8 @@ def main(host, dest, src, upload_all, dry_run):
     finally:
         if not dry_run:
             request("PUT", f"{base}/{MANIFEST}", data=json.dumps(uploaded, indent=1).encode())
-    click.echo(f"{len(pending)} of {len(new)} files {'would be ' if dry_run else ''}uploaded. {base}/index.html")
+    would = "would be " if dry_run else ""
+    click.echo(f"{len(pending)} of {len(new)} files {would}uploaded, {len(stale)} {would}deleted. {base}/index.html")
 
 
 if __name__ == "__main__":

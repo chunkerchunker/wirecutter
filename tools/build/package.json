@@ -1,0 +1,13 @@
+{
+  "name": "web-build",
+  "private": true,
+  "description": "Builds web/vendor/three.js (the three.js subset the simulator uses) and the bundled copy of web/ that deploy.py uploads.",
+  "scripts": {
+    "vendor": "node vendor.mjs",
+    "bundle": "node bundle.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "three": "0.186.0"
+  }
+}
