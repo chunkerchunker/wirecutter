@@ -17,7 +17,13 @@ const RT_RESET = '\x18';
 
 let ws = null;
 let isConnecting = false;
-let pendingOks = 0;
+// Byte lengths of sent lines not yet answered by ok/error, oldest first. Streaming
+// keeps their sum within the controller's receive buffer (Grbl character counting).
+let inflight = [];
+let inflightBytes = 0;
+let ackWaiters = [];
+const RX_BUFFER_BYTES = 256;  // FluidNC's per-channel rx_buffer_available(); overflow drops whole lines
+const utf8 = new TextEncoder();
 let rxBuffer = '';
 let rxDecoder = new TextDecoder();
 
@@ -306,7 +312,9 @@ function parseStatusReport(text) {
 function logTerminal(text, type = '') {
   if (type === '') {
     if (text.startsWith('ok') || text.startsWith('error')) {
-      pendingOks = Math.max(0, pendingOks - 1);
+      if (inflight.length) inflightBytes -= inflight.shift();
+      wakeAckWaiters();
+      if (text === 'ok' && isRunningGcode) return;  // one per line; logging them slows the stream
     }
     if (parseStatusReport(text)) return; // don't flood the log with ? responses
     if (parseAxisConfigLine(text)) return;
@@ -318,6 +326,27 @@ function logTerminal(text, type = '') {
   terminalOutput.appendChild(line);
   while (terminalOutput.childElementCount > maxTerminalLines) terminalOutput.firstElementChild.remove();
   terminalOutput.scrollTop = terminalOutput.scrollHeight;
+}
+
+function wakeAckWaiters() {
+  const waiters = ackWaiters;
+  ackWaiters = [];
+  waiters.forEach((fn) => fn());
+}
+
+// Lines still queued on the controller will never be acknowledged (reset, disconnect)
+function clearInflight() {
+  inflight = [];
+  inflightBytes = 0;
+  wakeAckWaiters();
+}
+
+// Resolves on the next ok/error, or after a short timeout so callers can recheck stop/pause
+function nextAck() {
+  return new Promise((resolve) => {
+    ackWaiters.push(resolve);
+    setTimeout(resolve, 100);
+  });
 }
 
 function isConnected() {
@@ -361,7 +390,7 @@ async function connectController() {
       ws = socket;
       connectedHost = host;
       isConnecting = false;
-      pendingOks = 0;
+      clearInflight();
       rxBuffer = '';
       rxDecoder = new TextDecoder();
       updateStatus('connected', `Connected to ${host}`);
@@ -390,7 +419,7 @@ async function connectController() {
       clearTimeout(timeout);
       if (ws === socket) {
         ws = null;
-        pendingOks = 0;
+        clearInflight();
         stopJog();
         updateStatus('disconnected', 'Disconnected');
         logTerminal('Connection closed' + (event.reason ? `: ${event.reason}` : '.'), 'system');
@@ -426,8 +455,11 @@ async function sendGcode(gcode, silent = false) {
   }
 
   try {
-    pendingOks++;
-    ws.send(trimmed + '\n');
+    const line = trimmed + '\n';
+    const bytes = utf8.encode(line).length;
+    inflight.push(bytes);
+    inflightBytes += bytes;
+    ws.send(line);
     if (!silent) logTerminal('> ' + trimmed, 'sent');
   } catch (err) {
     console.error('Send error:', err);
@@ -1121,14 +1153,16 @@ async function runProgram() {
   }
 }
 
-// Send lines in order, keeping at most two unacknowledged so the controller's input
-// buffer can't overflow. Lines are held back while paused, checked right before
-// sending so a line waiting on backpressure doesn't slip out after the feed hold.
+// Send lines in order, keeping the unacknowledged bytes within the controller's
+// receive buffer so it can't overflow (a lone over-long line is still sent). Lines are
+// held back while paused, checked right before sending so a line waiting on
+// backpressure doesn't slip out after the feed hold.
 // Returns false if a stop was requested before every line was sent.
 async function streamLines(lines, { silent = true, onSent } = {}) {
   for (let i = 0; i < lines.length; i++) {
-    while (pendingOks >= 2 && !stopRequested) {
-      await new Promise(r => setTimeout(r, 10));
+    const bytes = utf8.encode(lines[i].trim() + '\n').length;
+    while (inflight.length && inflightBytes + bytes > RX_BUFFER_BYTES && !stopRequested) {
+      await nextAck();
     }
     while (isPaused && !stopRequested) {
       await new Promise(r => setTimeout(r, 50));
@@ -1213,7 +1247,7 @@ async function stopMotion() {
 
   if (machineState.startsWith('Hold')) {
     sendRealtime(RT_RESET);
-    pendingOks = 0;  // commands still queued will never be acknowledged
+    clearInflight();
     logTerminal('Stopped; queued motion discarded.', 'system');
   } else {
     logTerminal(`Stopped (${machineState}).`, 'system');
@@ -1237,7 +1271,7 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
   stopJog();
   if (isStreaming) stopRequested = true;
   sendRealtime(RT_RESET);
-  pendingOks = 0;
+  clearInflight();
   logTerminal('Soft reset.', 'system');
 });
 

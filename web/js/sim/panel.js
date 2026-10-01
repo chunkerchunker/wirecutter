@@ -6,6 +6,7 @@ import { autoStock } from './carve.js';
 import { MM_PER_DEG } from '../machine.js';
 
 const $ = (id) => document.getElementById(id);
+const FOLLOW_MS = 100;  // min interval between run-follow updates of the view
 
 export function initSimPanel() {
   const panel = $('sim');
@@ -32,6 +33,7 @@ export function initSimPanel() {
   let rerunTimer = null;
   let running = false;
   let paused = false;
+  let followLine = null;  // latest line passed to follow(), awaiting its coalesced update
 
   async function ensureViewer() {
     if (viewer) return viewer;
@@ -220,10 +222,21 @@ export function initSimPanel() {
       updateLock();
     },
 
-    /** Called after each line is sent; -1 = program start */
+    /**
+     * Called after each line is sent; -1 = program start. Updates are coalesced to
+     * FOLLOW_MS because showTime can rebuild the stock mesh, and doing that per line
+     * on the main thread starves the sender of tiny moves.
+     */
     follow(fileLine) {
       if (!syncCb.checked || !moves.length) return;
-      showTime(fileLine < 0 ? 0 : lineEndTime(fileLine));
+      const scheduled = followLine !== null;
+      followLine = fileLine;
+      if (scheduled) return;
+      setTimeout(() => {
+        const line = followLine;
+        followLine = null;
+        if (syncCb.checked && moves.length) showTime(line < 0 ? 0 : lineEndTime(line));
+      }, FOLLOW_MS);
     },
   };
 }

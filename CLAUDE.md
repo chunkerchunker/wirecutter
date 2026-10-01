@@ -41,4 +41,5 @@ There are no tests. Verify UI changes with `just serve` against the live control
 - Soft reset while moving raises Abort Cycle; Stop does jog-cancel + feed hold, waits for `Hold:0`, then resets.
 - Realtime commands (`?`, `!`, `~`, `0x85`, `0x18`) bypass the line queue and get no `ok`.
 - Spindle `S` is modal and resets to 0 on boot/reset — always give it on the `M3` line. Spindle changes wait for queued motion to drain.
+- G-code streaming counts bytes Grbl-style: unacknowledged bytes stay ≤ 256 (FluidNC's `rx_buffer_available()`). Recent FluidNC silently drops whole lines when a channel's input queue overflows, so don't raise this budget without checking the firmware.
 - Moves from the UI use `$J` so they can't disturb modal G-code state.
